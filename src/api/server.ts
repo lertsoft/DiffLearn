@@ -4,15 +4,38 @@ import { serveStatic } from 'hono/bun';
 import { GitExtractor, DiffFormatter } from '../git';
 import { loadConfig, isLLMAvailable } from '../config';
 import { LLMClient, SYSTEM_PROMPT, createExplainPrompt, createReviewPrompt, createQuestionPrompt, createSummaryPrompt } from '../llm';
-import { join, dirname } from 'path';
+import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
+import { existsSync } from 'fs';
 
 const git = new GitExtractor(process.cwd());
 const formatter = new DiffFormatter();
 
 // Get the directory of this file for serving static files
+// This needs to work both in development and when installed globally
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const webDir = join(__dirname, '../web');
+
+// Try multiple possible locations for web files
+function findWebDir(): string {
+    const possiblePaths = [
+        join(__dirname, '../web'),           // Development: src/api -> src/web
+        join(__dirname, '../../src/web'),    // Built: dist/cli -> src/web
+        join(__dirname, '../src/web'),       // Linked: from project root
+        resolve(__dirname, '../../web'),     // Alternative built location
+    ];
+
+    for (const p of possiblePaths) {
+        if (existsSync(join(p, 'index.html'))) {
+            return p;
+        }
+    }
+
+    // Fallback to first option (will error with helpful message)
+    console.warn('Warning: Could not find web directory. Tried:', possiblePaths);
+    return possiblePaths[0];
+}
+
+const webDir = findWebDir();
 
 export async function startAPIServer(port: number = 3000) {
     const app = new Hono();
@@ -22,14 +45,22 @@ export async function startAPIServer(port: number = 3000) {
 
     // Serve static files from web directory
     app.get('/styles.css', async (c) => {
-        const file = Bun.file(join(webDir, 'styles.css'));
+        const filePath = join(webDir, 'styles.css');
+        if (!existsSync(filePath)) {
+            return c.text('File not found: ' + filePath, 404);
+        }
+        const file = Bun.file(filePath);
         return new Response(file, {
             headers: { 'Content-Type': 'text/css' },
         });
     });
 
     app.get('/app.js', async (c) => {
-        const file = Bun.file(join(webDir, 'app.js'));
+        const filePath = join(webDir, 'app.js');
+        if (!existsSync(filePath)) {
+            return c.text('File not found: ' + filePath, 404);
+        }
+        const file = Bun.file(filePath);
         return new Response(file, {
             headers: { 'Content-Type': 'application/javascript' },
         });
@@ -42,7 +73,11 @@ export async function startAPIServer(port: number = 3000) {
 
         if (accept.includes('text/html')) {
             // Serve the web UI
-            const file = Bun.file(join(webDir, 'index.html'));
+            const filePath = join(webDir, 'index.html');
+            if (!existsSync(filePath)) {
+                return c.text(`Web UI not found. Looking in: ${webDir}\n\nMake sure you're running from the DiffLearn project directory, or the web files exist.`, 404);
+            }
+            const file = Bun.file(filePath);
             return new Response(file, {
                 headers: { 'Content-Type': 'text/html' },
             });

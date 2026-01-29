@@ -2,7 +2,7 @@
 import React from 'react';
 import { render } from 'ink';
 import { Command } from 'commander';
-import { App, DiffMode } from './components/App';
+import { App, DiffMode, ConfigWizard } from './components';
 import { GitExtractor, DiffFormatter } from '../git';
 import { loadConfig, isLLMAvailable } from '../config';
 import { LLMClient, SYSTEM_PROMPT, createExplainPrompt, createReviewPrompt, createSummaryPrompt } from '../llm';
@@ -277,4 +277,25 @@ program
         }
     });
 
+// Configuration wizard
+program
+    .command('config')
+    .description('Configure LLM provider and authentication')
+    .option('--status', 'Show current configuration status')
+    .action(async (options) => {
+        if (options.status) {
+            // Quick status check without interactive UI
+            const config = loadConfig();
+            console.log(chalk.cyan('📊 DiffLearn Configuration\n'));
+            console.log(chalk.white('Current provider: ') + chalk.yellow(config.provider));
+            console.log(chalk.white('Model: ') + chalk.gray(config.model));
+            console.log(chalk.white('CLI-based: ') + chalk.gray(config.useCLI ? 'Yes' : 'No'));
+            console.log(chalk.white('LLM Available: ') + (isLLMAvailable(config) ? chalk.green('Yes') : chalk.red('No')));
+            return;
+        }
+
+        render(<ConfigWizard />);
+    });
+
 program.parse();
+

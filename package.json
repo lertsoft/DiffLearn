@@ -4,7 +4,7 @@
   "description": "Interactive git diff learning tool with LLM-powered explanations",
   "type": "module",
   "bin": {
-    "difflearn": "./dist/cli/index.js"
+    "difflearn": "./src/cli/index.tsx"
   },
   "scripts": {
     "dev": "bun run src/cli/index.tsx",

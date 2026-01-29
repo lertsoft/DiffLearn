@@ -70,7 +70,41 @@ difflearn summary
 
 ## LLM Configuration
 
-Set one of these environment variables:
+### Quick Setup (Recommended)
+
+The easiest way to configure DiffLearn is with the interactive wizard:
+
+```bash
+difflearn config
+```
+
+This will:
+- Show available providers (CLI-based and API-based)
+- Guide you through authentication
+- Save configuration securely to `~/.difflearn`
+
+### CLI-Based Providers (Free with Your Subscription!)
+
+Use your existing AI subscriptions without extra API costs:
+
+| Provider | Requirement |
+|----------|-------------|
+| **Gemini CLI** | [Install gemini-cli](https://github.com/google-gemini/gemini-cli) |
+| **Claude Code** | [Install claude](https://docs.anthropic.com/en/docs/claude-code) |
+| **OpenAI Codex** | [Install codex](https://github.com/openai/codex) |
+| **Cursor** | Cursor IDE installed |
+
+```bash
+# Check which providers are available
+difflearn config --status
+
+# Example: Use Gemini CLI
+export DIFFLEARN_LLM_PROVIDER=gemini-cli
+```
+
+### API-Based Providers
+
+For direct API access (pay-per-use):
 
 ```bash
 # Option 1: OpenAI (default)
@@ -87,6 +121,18 @@ export DIFFLEARN_LLM_PROVIDER=google
 # Optional: Custom model
 export DIFFLEARN_MODEL=gpt-4o-mini
 ```
+
+### Configuration File
+
+DiffLearn stores config in `~/.difflearn`:
+
+```bash
+# ~/.difflearn
+DIFFLEARN_LLM_PROVIDER=gemini-cli
+OPENAI_API_KEY=sk-...
+```
+
+Environment variables override the config file.
 
 > **Note:** DiffLearn works without an API key! When no LLM is configured, it outputs formatted prompts you can use with any AI tool.
 
@@ -147,6 +193,7 @@ POST /summary                       # Quick summary
 | `export [--format json\|markdown]` | Export diff |
 | `history [-n count]` | List commits |
 | `web [-p port]` | Launch the web UI |
+| `config [--status]` | Configure LLM provider |
 | `serve --mcp\|--api` | Start server |
 
 ## Building
