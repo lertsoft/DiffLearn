@@ -80,6 +80,8 @@ export function ConfigWizard() {
     const [apiKey, setApiKey] = useState('');
     const [message, setMessage] = useState('');
     const [isLoading, setIsLoading] = useState(true);
+    const [authRunning, setAuthRunning] = useState(false);
+    const [cachedConfig, setCachedConfig] = useState<{ provider: string; useCLI: boolean } | null>(null);
 
     // Check which CLI tools are installed
     useEffect(() => {
@@ -102,8 +104,19 @@ export function ConfigWizard() {
         checkProviders();
     }, []);
 
-    // Get current config
-    const currentConfig = loadConfig();
+    // Load config once on mount (suppress warnings)
+    useEffect(() => {
+        const originalWarn = console.warn;
+        console.warn = () => { }; // Temporarily suppress warnings
+        try {
+            const config = loadConfig();
+            setCachedConfig({ provider: config.provider, useCLI: config.useCLI });
+        } catch { }
+        console.warn = originalWarn;
+    }, []);
+
+    // Use cached config or default
+    const currentConfig = cachedConfig || { provider: 'openai', useCLI: false };
 
     useInput((input, key) => {
         if (key.escape || input === 'q') {
@@ -156,7 +169,8 @@ export function ConfigWizard() {
                 setApiKey((k) => k + input);
             }
         } else if (screen === 'cli-auth') {
-            if (key.return) {
+            if (key.return && !authRunning) {
+                setAuthRunning(true);
                 runAuthCommand(currentProvider!);
             }
         } else if (screen === 'success' || screen === 'status') {

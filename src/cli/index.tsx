@@ -285,7 +285,12 @@ program
     .action(async (options) => {
         if (options.status) {
             // Quick status check without interactive UI
+            // Suppress warnings temporarily
+            const originalWarn = console.warn;
+            console.warn = () => { };
             const config = loadConfig();
+            console.warn = originalWarn;
+
             console.log(chalk.cyan('📊 DiffLearn Configuration\n'));
             console.log(chalk.white('Current provider: ') + chalk.yellow(config.provider));
             console.log(chalk.white('Model: ') + chalk.gray(config.model));
