@@ -6,10 +6,12 @@
 const API_URL = '';
 
 // State
+// State
 let currentView = 'local';
 let currentDiff = null;
 let currentCommit = null;
 let commits = [];
+let pendingContext = null;
 
 // DOM Elements
 const elements = {
@@ -250,7 +252,8 @@ function renderDiff(data, title) {
     // Add click handlers for hunk headers
     document.querySelectorAll('.hunk-header').forEach(header => {
         header.addEventListener('click', (e) => {
-            if (e.target.classList.contains('ask-btn')) {
+            const btn = e.target.closest('.ask-btn');
+            if (btn) {
                 const hunkIndex = header.dataset.hunk;
                 const fileName = header.dataset.file;
                 askAboutHunk(fileName, hunkIndex);
@@ -284,8 +287,11 @@ function renderHunk(hunk, index, fileName) {
     return `
     <div class="hunk">
       <div class="hunk-header" data-hunk="${index}" data-file="${escapeHtml(fileName)}">
-        ${escapeHtml(hunk.header)}
-        <button class="ask-btn">Ask about this</button>
+        <span class="hunk-title">${escapeHtml(hunk.header)}</span>
+        <button class="ask-btn">
+            <span class="ask-icon">💬</span>
+            <span class="ask-text">Ask</span>
+        </button>
       </div>
       ${hunk.lines.map(line => renderDiffLine(line)).join('')}
     </div>
@@ -381,7 +387,13 @@ function removeLoadingMessage() {
 async function handleChat(question, contextOverride = null) {
     if (!question.trim()) return;
 
-    const context = contextOverride || getContextLabel();
+    let context = contextOverride;
+    if (!context) {
+        context = pendingContext || getContextLabel();
+        // Clear pending context after use
+        pendingContext = null;
+    }
+
     addMessage('user', question, context);
     elements.chatInput.value = '';
     elements.sendBtn.disabled = true;
@@ -396,9 +408,9 @@ async function handleChat(question, contextOverride = null) {
 
         if (result.success && result.data) {
             const answer = result.data.answer || result.data.prompt || 'No response';
-            addMessage('assistant', answer);
+            addMessage('assistant', answer, context);
         } else {
-            addMessage('assistant', `Error: ${result.error || 'Unknown error'}`);
+            addMessage('assistant', `Error: ${result.error || 'Unknown error'}`, context);
         }
     } catch (error) {
         removeLoadingMessage();
@@ -411,7 +423,14 @@ async function handleChat(question, contextOverride = null) {
 
 async function askAboutHunk(fileName, hunkIndex) {
     const question = `Please explain the changes in file "${fileName}", specifically the hunk at position ${hunkIndex}. What does this change do?`;
-    await handleChat(question, `File: ${fileName}`);
+
+    // Pre-fill input instead of sending immediately
+    elements.chatInput.value = question;
+    pendingContext = `File: ${fileName}`;
+
+    // Open chat panel
+    elements.chatPanel.classList.add('open');
+    elements.chatInput.focus();
 }
 
 function clearChat() {
@@ -438,7 +457,8 @@ async function handleQuickAction(action) {
         summary: 'Please provide a summary of these changes.'
     };
 
-    addMessage('user', questions[action] || `Action: ${action}`, getContextLabel());
+    const context = getContextLabel();
+    addMessage('user', questions[action] || `Action: ${action}`, context);
 
     btn.disabled = true;
     btn.innerHTML = '<span class="action-icon">⏳</span> Loading...';
@@ -463,9 +483,9 @@ async function handleQuickAction(action) {
 
         if (result.success && result.data) {
             const content = result.data.explanation || result.data.review || result.data.summary || result.data.prompt || 'No response';
-            addMessage('assistant', content);
+            addMessage('assistant', content, context);
         } else {
-            addMessage('assistant', `Error: ${result.error || 'Unknown error'}`);
+            addMessage('assistant', `Error: ${result.error || 'Unknown error'}`, context);
         }
     } catch (error) {
         removeLoadingMessage();
@@ -577,9 +597,18 @@ if (sidebar) {
     });
 }
 
-// Mobile chat toggle button
+// Mobile chat toggle button (floating)
 if (mobileChatToggle) {
     mobileChatToggle.addEventListener('click', () => {
+        elements.chatPanel.classList.add('open');
+        elements.chatInput.focus();
+    });
+}
+
+// Header chat button
+const headerChatBtn = document.getElementById('headerChatBtn');
+if (headerChatBtn) {
+    headerChatBtn.addEventListener('click', () => {
         elements.chatPanel.classList.add('open');
         elements.chatInput.focus();
     });
@@ -597,10 +626,12 @@ document.addEventListener('click', (e) => {
     if (window.innerWidth <= 900) {
         const chatPanel = elements.chatPanel;
         const toggle = mobileChatToggle;
+        const headerBtn = document.getElementById('headerChatBtn');
 
         if (chatPanel.classList.contains('open') &&
             !chatPanel.contains(e.target) &&
-            !toggle?.contains(e.target)) {
+            !toggle?.contains(e.target) &&
+            !headerBtn?.contains(e.target)) {
             chatPanel.classList.remove('open');
         }
     }
