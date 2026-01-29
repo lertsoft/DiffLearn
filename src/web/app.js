@@ -519,6 +519,81 @@ elements.reviewBtn.addEventListener('click', () => handleQuickAction('review'));
 elements.summaryBtn.addEventListener('click', () => handleQuickAction('summary'));
 
 // ============================================
+// Mobile Interactions
+// ============================================
+
+const sidebar = document.querySelector('.sidebar');
+const mobileChatToggle = document.getElementById('mobileChatToggle');
+const closeChatBtn = document.getElementById('closeChatBtn');
+
+// Toggle sidebar on mobile (tap header to expand/collapse)
+if (sidebar) {
+    const sidebarHeader = sidebar.querySelector('.sidebar-header');
+
+    sidebarHeader?.addEventListener('click', (e) => {
+        // Don't toggle if clicking the refresh button
+        if (e.target.closest('#refreshBtn')) return;
+
+        if (window.innerWidth <= 700) {
+            sidebar.classList.toggle('expanded');
+        }
+    });
+
+    // Collapse sidebar when clicking outside on mobile
+    document.addEventListener('click', (e) => {
+        if (window.innerWidth <= 700 &&
+            !sidebar.contains(e.target) &&
+            sidebar.classList.contains('expanded')) {
+            sidebar.classList.remove('expanded');
+        }
+    });
+}
+
+// Mobile chat toggle button
+if (mobileChatToggle) {
+    mobileChatToggle.addEventListener('click', () => {
+        elements.chatPanel.classList.add('open');
+        elements.chatInput.focus();
+    });
+}
+
+// Close chat button
+if (closeChatBtn) {
+    closeChatBtn.addEventListener('click', () => {
+        elements.chatPanel.classList.remove('open');
+    });
+}
+
+// Close chat panel when clicking outside on mobile
+document.addEventListener('click', (e) => {
+    if (window.innerWidth <= 900) {
+        const chatPanel = elements.chatPanel;
+        const toggle = mobileChatToggle;
+
+        if (chatPanel.classList.contains('open') &&
+            !chatPanel.contains(e.target) &&
+            !toggle?.contains(e.target)) {
+            chatPanel.classList.remove('open');
+        }
+    }
+});
+
+// Handle window resize
+let resizeTimeout;
+window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+        // Reset mobile states when resizing to desktop
+        if (window.innerWidth > 900) {
+            elements.chatPanel.classList.remove('open');
+        }
+        if (window.innerWidth > 700) {
+            sidebar?.classList.remove('expanded');
+        }
+    }, 100);
+});
+
+// ============================================
 // Initialize
 // ============================================
 
@@ -528,3 +603,4 @@ async function init() {
 }
 
 init();
+

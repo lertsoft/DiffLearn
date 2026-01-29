@@ -146,19 +146,68 @@ POST /summary                       # Quick summary
 | `summary [--staged]` | Quick summary |
 | `export [--format json\|markdown]` | Export diff |
 | `history [-n count]` | List commits |
+| `web [-p port]` | Launch the web UI |
 | `serve --mcp\|--api` | Start server |
 
-## Development
+## Building
+
+### Development
 
 ```bash
-# Run in development
+# Run in development mode
 bun run dev
 
-# Build
-bun run build
+# Launch web UI
+bun run web
 
 # Run tests
 bun test
+```
+
+### Cross-Platform Builds
+
+Build standalone executables for all major platforms:
+
+```bash
+# Build for current platform
+bun run build:macos
+
+# Build for specific platforms
+bun run build:macos-arm    # macOS Apple Silicon (M1/M2/M3)
+bun run build:macos-x64    # macOS Intel
+
+bun run build:linux        # Linux x64
+bun run build:linux-arm    # Linux ARM64
+
+bun run build:windows      # Windows x64
+
+# Build all platforms at once
+bun run build:all
+```
+
+### Output
+
+Compiled binaries are placed in `dist/`:
+
+| Platform | File |
+|----------|------|
+| macOS ARM64 | `dist/difflearn-macos-arm64` |
+| macOS x64 | `dist/difflearn-macos-x64` |
+| Linux x64 | `dist/difflearn-linux-x64` |
+| Linux ARM64 | `dist/difflearn-linux-arm64` |
+| Windows x64 | `dist/difflearn-windows-x64.exe` |
+
+### Usage After Build
+
+```bash
+# Make executable (macOS/Linux)
+chmod +x dist/difflearn-macos-arm64
+
+# Run directly
+./dist/difflearn-macos-arm64 web
+
+# Or move to your PATH
+mv dist/difflearn-macos-arm64 /usr/local/bin/difflearn
 ```
 
 ## Architecture

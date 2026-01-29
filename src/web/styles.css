@@ -8,41 +8,41 @@
   --bg-secondary: #161b22;
   --bg-tertiary: #21262d;
   --bg-hover: #30363d;
-  
+
   --text-primary: #e6edf3;
   --text-secondary: #8b949e;
   --text-muted: #6e7681;
-  
+
   --accent: #58a6ff;
   --accent-hover: #79b8ff;
-  
+
   --success: #3fb950;
   --success-bg: rgba(63, 185, 80, 0.15);
   --danger: #f85149;
   --danger-bg: rgba(248, 81, 73, 0.15);
   --warning: #d29922;
   --warning-bg: rgba(210, 153, 34, 0.15);
-  
+
   --border: #30363d;
   --border-subtle: #21262d;
-  
+
   /* Diff Colors */
   --diff-add-bg: rgba(63, 185, 80, 0.15);
   --diff-add-text: #7ee787;
   --diff-del-bg: rgba(248, 81, 73, 0.15);
   --diff-del-text: #ffa198;
   --diff-hunk-bg: rgba(56, 139, 253, 0.1);
-  
+
   /* Shadows */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
-  
+
   /* Spacing */
   --header-height: 60px;
   --sidebar-width: 280px;
   --chat-width: 380px;
-  
+
   /* Typography */
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
@@ -52,13 +52,16 @@
    Reset & Base
    ============================================ */
 
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
-html, body {
+html,
+body {
   height: 100%;
   font-family: var(--font-sans);
   font-size: 14px;
@@ -143,8 +146,15 @@ html, body {
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
 }
 
 .main {
@@ -264,7 +274,8 @@ html, body {
   background: linear-gradient(135deg, var(--bg-tertiary), rgba(88, 166, 255, 0.1));
 }
 
-.loading, .empty-state {
+.loading,
+.empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -362,10 +373,25 @@ html, body {
   border-radius: 4px;
 }
 
-.file-status.new { background: var(--success-bg); color: var(--success); }
-.file-status.deleted { background: var(--danger-bg); color: var(--danger); }
-.file-status.modified { background: var(--warning-bg); color: var(--warning); }
-.file-status.renamed { background: rgba(136, 87, 229, 0.15); color: #d2a8ff; }
+.file-status.new {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.file-status.deleted {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.file-status.modified {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+.file-status.renamed {
+  background: rgba(136, 87, 229, 0.15);
+  color: #d2a8ff;
+}
 
 .file-stats {
   display: flex;
@@ -544,8 +570,15 @@ html, body {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .message-header {
@@ -597,12 +630,25 @@ html, body {
   animation: bounce 1.4s infinite ease-in-out both;
 }
 
-.message-loading span:nth-child(1) { animation-delay: -0.32s; }
-.message-loading span:nth-child(2) { animation-delay: -0.16s; }
+.message-loading span:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.message-loading span:nth-child(2) {
+  animation-delay: -0.16s;
+}
 
 @keyframes bounce {
-  0%, 80%, 100% { transform: scale(0); }
-  40% { transform: scale(1); }
+
+  0%,
+  80%,
+  100% {
+    transform: scale(0);
+  }
+
+  40% {
+    transform: scale(1);
+  }
 }
 
 .chat-input-form {
@@ -704,23 +750,543 @@ html, body {
 }
 
 /* ============================================
-   Responsive
+   Responsive - Tablet
    ============================================ */
 
 @media (max-width: 1200px) {
   :root {
     --chat-width: 320px;
+    --sidebar-width: 240px;
   }
+}
+
+@media (max-width: 1024px) {
+  :root {
+    --chat-width: 280px;
+    --sidebar-width: 220px;
+  }
+
+  .action-btn {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .action-icon {
+    font-size: 14px;
+  }
+}
+
+/* ============================================
+   Responsive - Small Tablet / Large Phone
+   ============================================ */
+
+@media (max-width: 900px) {
+  :root {
+    --header-height: 56px;
+  }
+
+  /* Hide chat panel on smaller screens by default */
+  .chat-panel {
+    position: fixed;
+    right: 0;
+    top: var(--header-height);
+    bottom: 0;
+    width: 100%;
+    max-width: 400px;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    z-index: 100;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .chat-panel.open {
+    transform: translateX(0);
+  }
+
+  /* Add chat toggle button for mobile */
+  .mobile-chat-toggle {
+    display: flex !important;
+  }
+
+  .tagline {
+    display: none;
+  }
+}
+
+/* ============================================
+   Responsive - Phone
+   ============================================ */
+
+@media (max-width: 700px) {
+  :root {
+    --header-height: 52px;
+  }
+
+  /* Header adjustments */
+  .header {
+    padding: 0 12px;
+  }
+
+  .logo {
+    font-size: 16px;
+    gap: 6px;
+  }
+
+  .logo-icon {
+    font-size: 20px;
+  }
+
+  .llm-status {
+    padding: 4px 8px;
+    font-size: 10px;
+  }
+
+  .llm-status .status-text {
+    display: none;
+  }
+
+  /* Convert to single column layout */
+  .main {
+    flex-direction: column;
+  }
+
+  /* Sidebar becomes bottom nav + sheet */
+  .sidebar {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    top: auto;
+    width: 100%;
+    height: auto;
+    max-height: 60vh;
+    border-right: none;
+    border-top: 1px solid var(--border);
+    border-radius: 16px 16px 0 0;
+    transform: translateY(calc(100% - 100px));
+    transition: transform 0.3s ease;
+    z-index: 50;
+  }
+
+  .sidebar.expanded {
+    transform: translateY(0);
+  }
+
+  .sidebar-header {
+    padding: 12px 16px;
+    cursor: pointer;
+  }
+
+  /* Drag handle for sidebar */
+  .sidebar-header::before {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 0 auto 12px;
+  }
+
+  .view-selector {
+    padding: 8px 12px;
+    gap: 6px;
+  }
+
+  .view-btn {
+    padding: 10px 8px;
+    font-size: 12px;
+  }
+
+  .commit-list {
+    max-height: 40vh;
+    padding: 8px 12px;
+  }
+
+  .commit-item {
+    padding: 10px;
+  }
+
+  /* Diff panel fills remaining space */
+  .diff-panel {
+    padding-bottom: 100px;
+    /* Space for bottom nav */
+  }
+
+  .diff-header {
+    padding: 12px 16px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .diff-header h2 {
+    font-size: 13px;
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .diff-stats {
+    gap: 8px;
+    font-size: 11px;
+  }
+
+  .diff-content {
+    padding: 12px;
+  }
+
+  /* File diff adjustments */
+  .file-diff {
+    margin-bottom: 16px;
+  }
+
+  .file-header {
+    padding: 10px 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .file-name {
+    font-size: 11px;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .file-name span:last-child {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .hunk-header {
+    padding: 8px 12px;
+    font-size: 10px;
+  }
+
+  .hunk-header .ask-btn {
+    opacity: 1;
+    /* Always show on mobile */
+    padding: 4px 10px;
+    font-size: 10px;
+  }
+
+  .diff-line {
+    font-size: 11px;
+  }
+
+  .line-num {
+    width: 32px;
+    padding: 0 4px;
+    font-size: 10px;
+  }
+
+  .line-content {
+    padding: 0 8px;
+  }
+
+  /* Quick actions become bottom bar */
+  .quick-actions {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 8px 12px;
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+    gap: 6px;
+    z-index: 40;
+    justify-content: space-around;
+    border-radius: 12px 12px 0 0;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+  }
+
+  .action-btn {
+    flex: 1;
+    justify-content: center;
+    padding: 12px 8px;
+    font-size: 11px;
+    gap: 4px;
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .action-icon {
+    font-size: 18px;
+  }
+
+  /* Chat panel goes full screen on mobile */
+  .chat-panel {
+    max-width: 100%;
+    border-radius: 0;
+  }
+
+  .chat-header {
+    padding: 12px 16px;
+  }
+
+  .chat-messages {
+    padding: 12px;
+  }
+
+  .chat-input-form {
+    padding: 12px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+
+  .chat-input {
+    padding: 10px 12px;
+    font-size: 16px;
+    /* Prevent zoom on iOS */
+  }
+
+  .send-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  /* Empty state adjustments */
+  .empty-state {
+    padding: 30px 16px;
+  }
+
+  .empty-icon {
+    font-size: 36px;
+    margin-bottom: 12px;
+  }
+
+  .chat-welcome {
+    padding: 30px 16px;
+  }
+}
+
+/* ============================================
+   Responsive - Very Small Phone
+   ============================================ */
+
+@media (max-width: 400px) {
+  .header {
+    padding: 0 8px;
+  }
+
+  .logo {
+    font-size: 14px;
+  }
+
+  .logo-icon {
+    font-size: 18px;
+  }
+
+  .view-btn {
+    padding: 8px 4px;
+    font-size: 10px;
+  }
+
+  .diff-header h2 {
+    font-size: 12px;
+  }
+
+  .action-btn {
+    padding: 10px 4px;
+    font-size: 10px;
+  }
+
+  .line-num {
+    width: 28px;
+    font-size: 9px;
+  }
+
+  .diff-line {
+    font-size: 10px;
+  }
+}
+
+/* ============================================
+   Mobile Chat Toggle Button
+   ============================================ */
+
+.mobile-chat-toggle {
+  display: none;
+  position: fixed;
+  bottom: 70px;
+  right: 16px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  border: none;
+  font-size: 24px;
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  z-index: 45;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.mobile-chat-toggle:hover {
+  background: var(--accent-hover);
+  transform: scale(1.05);
+}
+
+.mobile-chat-toggle:active {
+  transform: scale(0.95);
+}
+
+/* Chat panel close button for mobile */
+.chat-close-btn {
+  display: none;
 }
 
 @media (max-width: 900px) {
-  .chat-panel {
-    display: none;
+  .chat-close-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    font-size: 18px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-primary);
+    cursor: pointer;
   }
 }
 
-@media (max-width: 700px) {
+/* ============================================
+   Touch Optimizations
+   ============================================ */
+
+@media (pointer: coarse) {
+
+  /* Larger touch targets */
+  .commit-item {
+    padding: 14px 12px;
+    margin-bottom: 6px;
+  }
+
+  .view-btn {
+    padding: 12px 8px;
+  }
+
+  .btn {
+    padding: 10px 16px;
+    min-height: 44px;
+  }
+
+  .hunk-header {
+    padding: 12px 16px;
+  }
+
+  .hunk-header .ask-btn {
+    padding: 8px 12px;
+  }
+
+  /* Disable hover effects that don't work on touch */
+  .commit-item:hover,
+  .view-btn:hover,
+  .action-btn:hover,
+  .hunk-header:hover {
+    background: inherit;
+  }
+
+  .commit-item:active {
+    background: var(--bg-hover);
+  }
+
+  .view-btn:active {
+    background: var(--bg-hover);
+  }
+
+  .action-btn:active {
+    background: var(--bg-hover);
+    border-color: var(--accent);
+  }
+
+  .hunk-header:active {
+    background: rgba(56, 139, 253, 0.2);
+  }
+}
+
+/* ============================================
+   Safe Area Support (iPhone notch, etc.)
+   ============================================ */
+
+@supports (padding: max(0px)) {
+  .header {
+    padding-left: max(20px, env(safe-area-inset-left));
+    padding-right: max(20px, env(safe-area-inset-right));
+  }
+
+  @media (max-width: 700px) {
+    .header {
+      padding-left: max(12px, env(safe-area-inset-left));
+      padding-right: max(12px, env(safe-area-inset-right));
+    }
+
+    .sidebar {
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+    }
+  }
+}
+
+/* ============================================
+   Landscape Phone
+   ============================================ */
+
+@media (max-width: 900px) and (orientation: landscape) and (max-height: 500px) {
+  :root {
+    --header-height: 44px;
+  }
+
   .sidebar {
-    display: none;
+    max-height: 50vh;
+    transform: translateY(calc(100% - 60px));
+  }
+
+  .quick-actions {
+    padding: 6px 12px;
+  }
+
+  .action-btn {
+    padding: 8px 12px;
+    flex-direction: row;
+  }
+}
+
+/* ============================================
+   Print Styles
+   ============================================ */
+
+@media print {
+
+  .sidebar,
+  .chat-panel,
+  .quick-actions,
+  .mobile-chat-toggle,
+  .llm-status {
+    display: none !important;
+  }
+
+  .main {
+    display: block;
+  }
+
+  .diff-panel {
+    padding-bottom: 0;
+  }
+
+  .diff-line.add {
+    background: #e6ffe6 !important;
+    color: #006400 !important;
+  }
+
+  .diff-line.del {
+    background: #ffe6e6 !important;
+    color: #8b0000 !important;
   }
 }

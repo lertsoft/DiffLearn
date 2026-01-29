@@ -8,10 +8,19 @@
   },
   "scripts": {
     "dev": "bun run src/cli/index.tsx",
+    "web": "bun run src/cli/index.tsx web",
     "build": "bun build src/cli/index.tsx --outdir dist/cli --target node",
+    "build:macos": "bun build src/cli/index.tsx --compile --outfile dist/difflearn-macos",
+    "build:macos-arm": "bun build src/cli/index.tsx --compile --target=bun-darwin-arm64 --outfile dist/difflearn-macos-arm64",
+    "build:macos-x64": "bun build src/cli/index.tsx --compile --target=bun-darwin-x64 --outfile dist/difflearn-macos-x64",
+    "build:linux": "bun build src/cli/index.tsx --compile --target=bun-linux-x64 --outfile dist/difflearn-linux-x64",
+    "build:linux-arm": "bun build src/cli/index.tsx --compile --target=bun-linux-arm64 --outfile dist/difflearn-linux-arm64",
+    "build:windows": "bun build src/cli/index.tsx --compile --target=bun-windows-x64 --outfile dist/difflearn-windows-x64.exe",
+    "build:all": "bun run build:macos-arm && bun run build:macos-x64 && bun run build:linux && bun run build:linux-arm && bun run build:windows",
     "test": "bun test",
     "serve:mcp": "bun run src/mcp/server.ts",
-    "serve:api": "bun run src/api/server.ts"
+    "serve:api": "bun run src/api/server.ts",
+    "serve:web": "bun run src/cli/index.tsx serve --api"
   },
   "dependencies": {
     "ink": "^5.0.1",
@@ -29,10 +38,26 @@
   },
   "devDependencies": {
     "@types/bun": "^1.1.14",
-    "@types/react": "^18.3.12",
     "@types/diff": "^6.0.0",
+    "@types/react": "^18.3.12",
+    "react-devtools-core": "^7.0.1",
     "typescript": "^5.7.2"
   },
-  "keywords": ["git", "diff", "llm", "code-review", "learning"],
-  "license": "MIT"
+  "keywords": [
+    "git",
+    "diff",
+    "llm",
+    "code-review",
+    "learning",
+    "cli",
+    "mcp"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/difflearn"
+  },
+  "engines": {
+    "bun": ">=1.0.0"
+  }
 }

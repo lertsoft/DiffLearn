@@ -1,14 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0d1117">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>DiffLearn - Git Diff Learning Tool</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
 </head>
+
 <body>
   <div class="app">
     <!-- Header -->
@@ -38,7 +45,7 @@
             <span>↻</span>
           </button>
         </div>
-        
+
         <!-- View Selector -->
         <div class="view-selector">
           <button class="view-btn active" data-view="local">Local Changes</button>
@@ -58,7 +65,7 @@
           <h2>Select a commit or view local changes</h2>
           <div class="diff-stats" id="diffStats"></div>
         </div>
-        
+
         <div class="diff-content" id="diffContent">
           <div class="empty-state">
             <div class="empty-icon">📂</div>
@@ -87,7 +94,10 @@
       <aside class="chat-panel" id="chatPanel">
         <div class="chat-header">
           <h2>💬 Ask About Changes</h2>
-          <button class="btn btn-sm" id="clearChatBtn" title="Clear chat">Clear</button>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-sm" id="clearChatBtn" title="Clear chat">Clear</button>
+            <button class="chat-close-btn" id="closeChatBtn" title="Close">✕</button>
+          </div>
         </div>
 
         <div class="chat-messages" id="chatMessages">
@@ -98,21 +108,21 @@
         </div>
 
         <form class="chat-input-form" id="chatForm">
-          <input 
-            type="text" 
-            class="chat-input" 
-            id="chatInput" 
-            placeholder="Ask about this diff..."
-            autocomplete="off"
-          >
+          <input type="text" class="chat-input" id="chatInput" placeholder="Ask about this diff..." autocomplete="off">
           <button type="submit" class="send-btn" id="sendBtn">
             <span>→</span>
           </button>
         </form>
       </aside>
     </main>
+
+    <!-- Mobile Chat Toggle -->
+    <button class="mobile-chat-toggle" id="mobileChatToggle" title="Open chat">
+      💬
+    </button>
   </div>
 
   <script src="/app.js"></script>
 </body>
+
 </html>
