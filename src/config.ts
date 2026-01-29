@@ -3,7 +3,8 @@ export type LLMProvider =
     | 'anthropic'
     | 'google'
     | 'gemini-cli'
-    | 'claude-cli'
+    | 'claude-code'
+    | 'codex'
     | 'cursor-cli';
 
 export interface Config {
@@ -28,8 +29,9 @@ const PROVIDER_DEFAULTS: Record<LLMProvider, ProviderDefaults> = {
     google: { model: 'gemini-2.0-flash', envKey: 'GOOGLE_AI_API_KEY' },
     // CLI-based providers (use existing subscriptions)
     'gemini-cli': { model: 'gemini', envKey: '', cli: true, command: 'gemini' },
-    'claude-cli': { model: 'claude', envKey: '', cli: true, command: 'claude' },
-    'cursor-cli': { model: 'cursor', envKey: '', cli: true, command: 'cursor-agent' },
+    'claude-code': { model: 'claude', envKey: '', cli: true, command: 'claude' },
+    'codex': { model: 'codex', envKey: '', cli: true, command: 'codex' },
+    'cursor-cli': { model: 'cursor', envKey: '', cli: true, command: 'cursor' },
 };
 
 /**
@@ -54,7 +56,7 @@ export function loadConfig(): Config {
     if (!PROVIDER_DEFAULTS[provider]) {
         throw new Error(
             `Unknown LLM provider: ${provider}. ` +
-            `Use 'openai', 'anthropic', 'google', 'gemini-cli', 'claude-cli', or 'cursor-cli'.`
+            `Use 'openai', 'anthropic', 'google', 'gemini-cli', 'claude-code', 'codex', or 'cursor-cli'.`
         );
     }
 
@@ -66,7 +68,7 @@ export function loadConfig(): Config {
 
     if (!useCLI && !apiKey) {
         console.warn(`Warning: ${defaults.envKey} not set. LLM features will be unavailable.`);
-        console.warn(`Tip: Use 'gemini-cli', 'claude-cli', or 'cursor-cli' to use your existing subscriptions.`);
+        console.warn(`Tip: Use 'gemini-cli', 'claude-code', 'codex', or 'cursor-cli' to use your existing subscriptions.`);
     }
 
     return {
@@ -105,8 +107,9 @@ export function detectProvider(): LLMProvider | null {
 export async function detectCLIProvider(): Promise<LLMProvider | null> {
     // Check for CLI tools in order of preference
     if (await isCLIAvailable('gemini')) return 'gemini-cli';
-    if (await isCLIAvailable('claude')) return 'claude-cli';
-    if (await isCLIAvailable('cursor-agent')) return 'cursor-cli';
+    if (await isCLIAvailable('claude')) return 'claude-code';
+    if (await isCLIAvailable('codex')) return 'codex';
+    if (await isCLIAvailable('cursor')) return 'cursor-cli';
     return null;
 }
 
