@@ -294,11 +294,13 @@ function renderHunk(hunk, index, fileName) {
 
 function renderDiffLine(line) {
     const type = line.type;
+    // Map type to CSS class (CSS uses 'del' not 'delete')
+    const cssClass = type === 'delete' ? 'del' : type;
     const prefix = type === 'add' ? '+' : type === 'delete' ? '-' : ' ';
     const lineNum = type === 'delete' ? (line.oldLineNumber || '') : (line.newLineNumber || '');
 
     return `
-    <div class="diff-line ${type}">
+    <div class="diff-line ${cssClass}">
       <span class="line-num">${lineNum}</span>
       <span class="line-content">${prefix}${escapeHtml(line.content)}</span>
     </div>
@@ -319,12 +321,19 @@ function addMessage(role, content) {
 
     const messageEl = document.createElement('div');
     messageEl.className = `message ${role}`;
+    let renderedContent;
+    if (role === 'assistant' && typeof marked !== 'undefined') {
+        renderedContent = marked.parse(content);
+    } else {
+        renderedContent = escapeHtml(content);
+    }
+
     messageEl.innerHTML = `
     <div class="message-header">
       <span>${icon}</span>
       <span>${label}</span>
     </div>
-    <div class="message-content">${escapeHtml(content)}</div>
+    <div class="message-content">${renderedContent}</div>
   `;
 
     elements.chatMessages.appendChild(messageEl);
@@ -411,6 +420,14 @@ async function handleQuickAction(action) {
     const staged = currentView === 'staged';
     const btn = elements[`${action}Btn`];
     const originalText = btn.innerHTML;
+
+    const questions = {
+        explain: 'Please explain these changes.',
+        review: 'Please review these changes for potential issues.',
+        summary: 'Please provide a summary of these changes.'
+    };
+
+    addMessage('user', questions[action] || `Action: ${action}`);
 
     btn.disabled = true;
     btn.innerHTML = '<span class="action-icon">⏳</span> Loading...';

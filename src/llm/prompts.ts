@@ -19,6 +19,12 @@ Format:
 - Lines starting with '-' are deletions (shown in red)
 - Lines starting with ' ' are context (unchanged)
 
+Output Format:
+- Use Markdown for formatting
+- Use **bold** for emphasis and important terms
+- Use \`code blocks\` for code snippets
+- Use lists for readability
+
 Keep responses focused and actionable.`;
 
 /**
