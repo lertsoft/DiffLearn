@@ -88,31 +88,31 @@ async function fetchHistory(limit = 20) {
     return await fetchJSON(`/history?limit=${limit}`);
 }
 
-async function askQuestion(question, staged = false) {
+async function askQuestion(question, staged = false, commit = null) {
     return await fetchJSON('/ask', {
         method: 'POST',
-        body: JSON.stringify({ question, staged }),
+        body: JSON.stringify({ question, staged, commit }),
     });
 }
 
-async function explainDiff(staged = false) {
+async function explainDiff(staged = false, commit = null) {
     return await fetchJSON('/explain', {
         method: 'POST',
-        body: JSON.stringify({ staged }),
+        body: JSON.stringify({ staged, commit }),
     });
 }
 
-async function reviewDiff(staged = false) {
+async function reviewDiff(staged = false, commit = null) {
     return await fetchJSON('/review', {
         method: 'POST',
-        body: JSON.stringify({ staged }),
+        body: JSON.stringify({ staged, commit }),
     });
 }
 
-async function summarizeDiff(staged = false) {
+async function summarizeDiff(staged = false, commit = null) {
     return await fetchJSON('/summary', {
         method: 'POST',
-        body: JSON.stringify({ staged }),
+        body: JSON.stringify({ staged, commit }),
     });
 }
 
@@ -409,7 +409,8 @@ async function handleChat(question, contextOverride = null) {
 
     try {
         const staged = currentView === 'staged';
-        const result = await askQuestion(question, staged);
+        const commit = currentView === 'history' ? currentCommit : null;
+        const result = await askQuestion(question, staged, commit);
 
         removeLoadingMessage();
 
@@ -455,6 +456,7 @@ function clearChat() {
 
 async function handleQuickAction(action) {
     const staged = currentView === 'staged';
+    const commit = currentView === 'history' ? currentCommit : null;
     const btn = elements[`${action}Btn`];
     const originalText = btn.innerHTML;
 
@@ -476,13 +478,13 @@ async function handleQuickAction(action) {
         let result;
         switch (action) {
             case 'explain':
-                result = await explainDiff(staged);
+                result = await explainDiff(staged, commit);
                 break;
             case 'review':
-                result = await reviewDiff(staged);
+                result = await reviewDiff(staged, commit);
                 break;
             case 'summary':
-                result = await summarizeDiff(staged);
+                result = await summarizeDiff(staged, commit);
                 break;
         }
 

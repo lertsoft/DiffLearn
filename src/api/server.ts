@@ -189,10 +189,11 @@ export async function startAPIServer(port: number = 3000) {
     app.post('/explain', async (c) => {
         const body = await c.req.json().catch(() => ({}));
         const staged = body.staged || false;
+        const commit = body.commit;
 
         try {
             const config = loadConfig();
-            const diffs = await git.getLocalDiff({ staged });
+            const diffs = commit ? await git.getCommitDiff(commit) : await git.getLocalDiff({ staged });
 
             if (diffs.length === 0) {
                 return c.json({ success: true, data: { explanation: 'No changes to explain.' } });
@@ -232,10 +233,11 @@ export async function startAPIServer(port: number = 3000) {
     app.post('/review', async (c) => {
         const body = await c.req.json().catch(() => ({}));
         const staged = body.staged || false;
+        const commit = body.commit;
 
         try {
             const config = loadConfig();
-            const diffs = await git.getLocalDiff({ staged });
+            const diffs = commit ? await git.getCommitDiff(commit) : await git.getLocalDiff({ staged });
 
             if (diffs.length === 0) {
                 return c.json({ success: true, data: { review: 'No changes to review.' } });
@@ -274,7 +276,7 @@ export async function startAPIServer(port: number = 3000) {
     // Ask about diff
     app.post('/ask', async (c) => {
         const body = await c.req.json().catch(() => ({}));
-        const { question, staged } = body;
+        const { question, staged, commit } = body;
 
         if (!question) {
             return c.json({ success: false, error: 'Question is required' }, 400);
@@ -282,7 +284,7 @@ export async function startAPIServer(port: number = 3000) {
 
         try {
             const config = loadConfig();
-            const diffs = await git.getLocalDiff({ staged });
+            const diffs = commit ? await git.getCommitDiff(commit) : await git.getLocalDiff({ staged });
 
             if (diffs.length === 0) {
                 return c.json({ success: true, data: { answer: 'No changes to ask about.' } });
@@ -322,10 +324,11 @@ export async function startAPIServer(port: number = 3000) {
     app.post('/summary', async (c) => {
         const body = await c.req.json().catch(() => ({}));
         const staged = body.staged || false;
+        const commit = body.commit;
 
         try {
             const config = loadConfig();
-            const diffs = await git.getLocalDiff({ staged });
+            const diffs = commit ? await git.getCommitDiff(commit) : await git.getLocalDiff({ staged });
 
             if (diffs.length === 0) {
                 return c.json({ success: true, data: { summary: 'No changes to summarize.' } });
