@@ -38,6 +38,8 @@
           <span class="status-dot"></span>
           <span class="status-text">Checking AI...</span>
         </div>
+        <button class="theme-toggle-btn" id="shortcutsBtn" title="Keyboard Shortcuts"
+          aria-label="Keyboard Shortcuts">⌨️</button>
         <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle Theme"
           aria-label="Toggle Dark Mode">☀️</button>
         <button class="header-chat-btn mobile-only" id="headerChatBtn" title="Chat" aria-label="Open Chat">💬</button>
@@ -135,6 +137,39 @@
       💬
     </button>
   </div>
+
+  <!-- Shortcuts Modal -->
+  <dialog id="shortcutsDialog" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Keyboard Shortcuts</h2>
+        <button class="close-btn" id="closeShortcutsBtn" aria-label="Close Modal">✕</button>
+      </div>
+      <div class="shortcuts-grid">
+        <div class="shortcut-group">
+          <h3>Navigation</h3>
+          <div class="shortcut-row">
+            <span><kbd>w</kbd> / <kbd>s</kbd></span> <span>Select Commit (Up/Down)</span>
+          </div>
+          <div class="shortcut-row">
+            <span><kbd>a</kbd> / <kbd>d</kbd></span> <span>Switch View (Left/Right)</span>
+          </div>
+          <div class="shortcut-row">
+            <kbd>Enter</kbd> <span>Select Focused</span>
+          </div>
+        </div>
+        <div class="shortcut-group">
+          <h3>General</h3>
+          <div class="shortcut-row">
+            <kbd>/</kbd> <span>Focus Chat</span>
+          </div>
+          <div class="shortcut-row">
+            <kbd>Esc</kbd> <span>Close / Blur</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </dialog>
 
   <script src="/app.js"></script>
 </body>

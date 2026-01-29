@@ -790,8 +790,32 @@ function selectCurrentCommit() {
     if (active) active.click();
 }
 
+// Init Shortcuts Modal
+function initShortcutsModal() {
+    const btn = document.getElementById('shortcutsBtn');
+    const dialog = document.getElementById('shortcutsDialog');
+    const closeBtn = document.getElementById('closeShortcutsBtn');
+
+    if (!btn || !dialog || !closeBtn) return;
+
+    btn.addEventListener('click', () => {
+        dialog.showModal();
+    });
+
+    closeBtn.addEventListener('click', () => {
+        dialog.close();
+    });
+
+    dialog.addEventListener('click', (e) => {
+        if (e.target === dialog) {
+            dialog.close();
+        }
+    });
+}
+
 async function init() {
     initTheme();
+    initShortcutsModal();
     initKeyboardShortcuts();
     await checkLLMStatus();
     await renderCommitList();
