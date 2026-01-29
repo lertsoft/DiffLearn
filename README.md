@@ -10,10 +10,12 @@ DiffLearn helps developers understand code changes through an interactive termin
 
 - **🎨 Interactive Diff Viewer** - Red/green syntax highlighting with keyboard navigation
 - **💬 Click-to-Ask** - Select any change and ask questions about it
-- **🤖 LLM Integration** - Supports OpenAI, Anthropic (Claude), and Google AI
+- **🆓 Use Your Subscriptions** - Works with Gemini CLI, Claude Code, Cursor (no API fees!)
+- **🤖 API Support** - Also supports OpenAI, Anthropic, and Google APIs
 - **🔌 MCP Server** - Works with Cursor, Claude Code, Gemini CLI, OpenCode
 - **🌐 REST API** - Programmatic access for custom integrations
 - **📊 Multiple Modes** - Local changes, commits, branches, staged files
+
 
 ## Installation
 
