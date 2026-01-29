@@ -164,7 +164,12 @@ async function renderHistoryList() {
     commits = result.data;
 
     elements.commitList.innerHTML = commits.map((commit, index) => `
-    <div class="commit-item ${index === 0 ? 'active' : ''}" data-type="commit" data-sha="${commit.hash}">
+    <div class="commit-item ${index === 0 ? 'active' : ''}" 
+         data-type="commit" 
+         data-sha="${commit.hash}"
+         role="option"
+         tabindex="0"
+         aria-selected="${index === 0 ? 'true' : 'false'}">
       <div class="commit-hash">${commit.hash.slice(0, 7)}</div>
       <div class="commit-message">${escapeHtml(commit.message.split('\n')[0])}</div>
       <div class="commit-meta">
@@ -206,8 +211,17 @@ async function loadCommitDiff(sha) {
     elements.diffContent.innerHTML = '<div class="loading">Loading diff...</div>';
 
     // Update active state
-    document.querySelectorAll('.commit-item').forEach(el => el.classList.remove('active'));
-    document.querySelector(`[data-sha="${sha}"]`)?.classList.add('active');
+    document.querySelectorAll('.commit-item').forEach(el => {
+        el.classList.remove('active');
+        el.setAttribute('aria-selected', 'false');
+    });
+    const activeItem = document.querySelector(`[data-sha="${sha}"]`);
+    if (activeItem) {
+        activeItem.classList.add('active');
+        activeItem.setAttribute('aria-selected', 'true');
+        // Ensure visible
+        activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
 
     const result = await fetchCommitDiff(sha);
 
@@ -697,8 +711,86 @@ function initTheme() {
     });
 }
 
+function initKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+        const isInput = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
+        if (isInput) {
+            if (e.key === 'Escape') {
+                e.target.blur();
+            }
+            return;
+        }
+
+        switch (e.key) {
+            case '/':
+                e.preventDefault();
+                if (elements.chatPanel) elements.chatPanel.classList.add('open');
+                if (elements.chatInput) elements.chatInput.focus();
+                break;
+            case '[':
+                cycleView(-1);
+                break;
+            case ']':
+                cycleView(1);
+                break;
+            case 'j':
+            case 'ArrowDown':
+                moveCommitSelection(1);
+                break;
+            case 'k':
+            case 'ArrowUp':
+                moveCommitSelection(-1);
+                break;
+            case 'Enter':
+                selectCurrentCommit();
+                break;
+            case 'Escape':
+                if (elements.chatPanel) elements.chatPanel.classList.remove('open');
+                const sidebar = document.querySelector('.sidebar');
+                if (window.innerWidth <= 700 && sidebar) {
+                    sidebar.classList.remove('expanded');
+                }
+                break;
+        }
+    });
+}
+
+function cycleView(direction) {
+    const views = Array.from(elements.viewBtns);
+    const currentIndex = views.findIndex(btn => btn.classList.contains('active'));
+    if (currentIndex === -1) return;
+
+    let newIndex = currentIndex + direction;
+    if (newIndex < 0) newIndex = views.length - 1;
+    if (newIndex >= views.length) newIndex = 0;
+
+    views[newIndex].click();
+}
+
+function moveCommitSelection(direction) {
+    const active = elements.commitList.querySelector('.commit-item.active');
+    let target;
+
+    if (!active) {
+        target = elements.commitList.querySelector('.commit-item');
+    } else {
+        target = direction > 0 ? active.nextElementSibling : active.previousElementSibling;
+    }
+
+    if (target && target.classList.contains('commit-item')) {
+        target.click();
+        target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+}
+
+function selectCurrentCommit() {
+    const active = elements.commitList.querySelector('.commit-item.active');
+    if (active) active.click();
+}
+
 async function init() {
     initTheme();
+    initKeyboardShortcuts();
     await checkLLMStatus();
     await renderCommitList();
 }

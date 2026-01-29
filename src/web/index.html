@@ -34,90 +34,96 @@
         </div>
       </div>
       <div class="header-right">
-        <div class="llm-status" id="llmStatus">
+        <div class="llm-status" id="llmStatus" role="status" aria-live="polite">
           <span class="status-dot"></span>
           <span class="status-text">Checking AI...</span>
         </div>
-        <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle Theme">☀️</button>
-        <button class="header-chat-btn mobile-only" id="headerChatBtn" title="Chat">💬</button>
+        <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle Theme"
+          aria-label="Toggle Dark Mode">☀️</button>
+        <button class="header-chat-btn mobile-only" id="headerChatBtn" title="Chat" aria-label="Open Chat">💬</button>
       </div>
     </header>
 
     <!-- Main Content -->
     <main class="main">
       <!-- Sidebar: Commit History -->
-      <aside class="sidebar">
+      <aside class="sidebar" aria-label="Commit History">
         <div class="sidebar-header">
           <h2>Commits</h2>
-          <button class="btn btn-sm" id="refreshBtn" title="Refresh">
+          <button class="btn btn-sm" id="refreshBtn" title="Refresh" aria-label="Refresh Commits">
             <span>↻</span>
           </button>
         </div>
 
         <!-- View Selector -->
-        <div class="view-selector">
-          <button class="view-btn active" data-view="local">Local Changes</button>
-          <button class="view-btn" data-view="staged">Staged</button>
-          <button class="view-btn" data-view="history">History</button>
+        <div class="view-selector" role="tablist" aria-label="Diff View Mode">
+          <button class="view-btn active" data-view="local" role="tab" aria-selected="true"
+            aria-controls="commitList">Local Changes</button>
+          <button class="view-btn" data-view="staged" role="tab" aria-selected="false"
+            aria-controls="commitList">Staged</button>
+          <button class="view-btn" data-view="history" role="tab" aria-selected="false"
+            aria-controls="commitList">History</button>
         </div>
 
         <!-- Commit List -->
-        <div class="commit-list" id="commitList">
+        <div class="commit-list" id="commitList" role="listbox" aria-label="List of commits">
           <div class="loading">Loading...</div>
         </div>
       </aside>
 
       <!-- Diff Viewer -->
-      <section class="diff-panel">
+      <section class="diff-panel" aria-label="Diff Viewer" role="region">
         <div class="diff-header" id="diffHeader">
           <h2>Select a commit or view local changes</h2>
-          <div class="diff-stats" id="diffStats"></div>
+          <div class="diff-stats" id="diffStats" aria-live="polite"></div>
         </div>
 
-        <div class="diff-content" id="diffContent">
+        <div class="diff-content" id="diffContent" tabindex="0" aria-label="Diff Content">
           <div class="empty-state">
-            <div class="empty-icon">📂</div>
+            <div class="empty-icon" aria-hidden="true">📂</div>
             <p>Select a commit from the sidebar or view your local changes</p>
           </div>
         </div>
 
         <!-- Quick Actions -->
-        <div class="quick-actions" id="quickActions" style="display: none;">
-          <button class="action-btn" id="explainBtn">
-            <span class="action-icon">💡</span>
+        <div class="quick-actions" id="quickActions" style="display: none;" role="toolbar" aria-label="Diff Actions">
+          <button class="action-btn" id="explainBtn" aria-label="Explain Changes">
+            <span class="action-icon" aria-hidden="true">💡</span>
             Explain Changes
           </button>
-          <button class="action-btn" id="reviewBtn">
-            <span class="action-icon">📋</span>
+          <button class="action-btn" id="reviewBtn" aria-label="Code Review">
+            <span class="action-icon" aria-hidden="true">📋</span>
             Code Review
           </button>
-          <button class="action-btn" id="summaryBtn">
-            <span class="action-icon">📝</span>
+          <button class="action-btn" id="summaryBtn" aria-label="Generate Summary">
+            <span class="action-icon" aria-hidden="true">📝</span>
             Summary
           </button>
         </div>
       </section>
 
       <!-- Chat Panel -->
-      <aside class="chat-panel" id="chatPanel">
+      <aside class="chat-panel" id="chatPanel" aria-label="AI Chat Assistant">
         <div class="chat-header">
           <h2>💬 Ask About Changes</h2>
           <div style="display: flex; gap: 8px;">
-            <button class="btn btn-sm" id="clearChatBtn" title="Clear chat">Clear</button>
-            <button class="chat-close-btn" id="closeChatBtn" title="Close">✕</button>
+            <button class="btn btn-sm" id="clearChatBtn" title="Clear chat"
+              aria-label="Clear Chat History">Clear</button>
+            <button class="chat-close-btn" id="closeChatBtn" title="Close" aria-label="Close Chat Panel">✕</button>
           </div>
         </div>
 
-        <div class="chat-messages" id="chatMessages">
+        <div class="chat-messages" id="chatMessages" role="log" aria-live="polite" aria-label="Chat Messages">
           <div class="chat-welcome">
             <p>👋 Ask questions about the selected diff!</p>
             <p class="hint">Try: "What does this change do?" or "Is there a bug here?"</p>
           </div>
         </div>
 
-        <form class="chat-input-form" id="chatForm">
-          <input type="text" class="chat-input" id="chatInput" placeholder="Ask about this diff..." autocomplete="off">
-          <button type="submit" class="send-btn" id="sendBtn">
+        <form class="chat-input-form" id="chatForm" aria-label="Chat Input">
+          <input type="text" class="chat-input" id="chatInput" placeholder="Ask about this diff..." autocomplete="off"
+            aria-label="Ask a question">
+          <button type="submit" class="send-btn" id="sendBtn" aria-label="Send Message">
             <span>→</span>
           </button>
         </form>
@@ -125,7 +131,7 @@
     </main>
 
     <!-- Mobile Chat Toggle -->
-    <button class="mobile-chat-toggle" id="mobileChatToggle" title="Open chat">
+    <button class="mobile-chat-toggle" id="mobileChatToggle" title="Open chat" aria-label="Open Chat">
       💬
     </button>
   </div>
