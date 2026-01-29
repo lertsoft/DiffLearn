@@ -727,17 +727,19 @@ function initKeyboardShortcuts() {
                 if (elements.chatPanel) elements.chatPanel.classList.add('open');
                 if (elements.chatInput) elements.chatInput.focus();
                 break;
-            case '[':
+            case 'a':
+            case 'ArrowLeft':
                 cycleView(-1);
                 break;
-            case ']':
+            case 'd':
+            case 'ArrowRight':
                 cycleView(1);
                 break;
-            case 'j':
+            case 's':
             case 'ArrowDown':
                 moveCommitSelection(1);
                 break;
-            case 'k':
+            case 'w':
             case 'ArrowUp':
                 moveCommitSelection(-1);
                 break;

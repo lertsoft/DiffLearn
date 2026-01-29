@@ -36,7 +36,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
         if (!isFocused) return;
 
         // Navigation
-        if (key.upArrow || input === 'k') {
+        if (key.upArrow || input === 'k' || input === 'w') {
             const currentIdx = allHunks.findIndex(
                 h => h.diffIndex === selectedHunk.diffIndex && h.hunkIndex === selectedHunk.hunkIndex
             );
@@ -44,7 +44,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                 const prev = allHunks[currentIdx - 1];
                 setSelectedHunk({ diffIndex: prev.diffIndex, hunkIndex: prev.hunkIndex });
             }
-        } else if (key.downArrow || input === 'j') {
+        } else if (key.downArrow || input === 'j' || input === 's') {
             const currentIdx = allHunks.findIndex(
                 h => h.diffIndex === selectedHunk.diffIndex && h.hunkIndex === selectedHunk.hunkIndex
             );
@@ -93,7 +93,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                 <Text color="green">+{diffs.reduce((s, d) => s + d.additions, 0)}</Text>
                 <Text color="gray"> / </Text>
                 <Text color="red">-{diffs.reduce((s, d) => s + d.deletions, 0)}</Text>
-                <Text color="gray"> • Use ↑↓ to navigate, ? to ask, Enter to expand</Text>
+                <Text color="gray"> • Use ↑↓/ws to navigate, ? to ask, Enter to expand</Text>
             </Box>
 
             {/* Diffs */}

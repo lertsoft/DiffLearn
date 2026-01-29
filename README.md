@@ -57,12 +57,26 @@ difflearn review
 difflearn summary
 ```
 
-## Interactive Controls
+## Web UI Accessibility & Controls
+
+The Web Interface (`difflearn web`) is fully accessible and keyboard-friendly:
 
 | Key | Action |
 |-----|--------|
-| `↑`/`k` | Move to previous hunk |
-| `↓`/`j` | Move to next hunk |
+| `s`/`j`/`↓` | Select next commit |
+| `w`/`k`/`↑` | Select previous commit |
+| `Enter` | Select currently focused commit |
+| `a`/`←` | Switch to previous view (e.g. History → Staged) |
+| `d`/`→` | Switch to next view (e.g. Local → Staged) |
+| `/` | Focus Chat Input |
+| `Esc` | Close panels / Clear focus |
+
+## CLI Interactive Controls
+
+| Key | Action |
+|-----|--------|
+| `↑`/`k`/`w` | Move to previous hunk |
+| `↓`/`j`/`s` | Move to next hunk |
 | `?` | Open chat for selected hunk |
 | `Enter` | Expand/collapse hunk |
 | `ESC` | Close chat panel |
