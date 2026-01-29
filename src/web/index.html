@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DiffLearn - Git Diff Learning Tool</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <h1 class="logo">
+          <span class="logo-icon">🔍</span>
+          DiffLearn
+        </h1>
+        <span class="tagline">Git Diff Learning Tool</span>
+      </div>
+      <div class="header-right">
+        <div class="llm-status" id="llmStatus">
+          <span class="status-dot"></span>
+          <span class="status-text">Checking AI...</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+      <!-- Sidebar: Commit History -->
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <h2>Commits</h2>
+          <button class="btn btn-sm" id="refreshBtn" title="Refresh">
+            <span>↻</span>
+          </button>
+        </div>
+        
+        <!-- View Selector -->
+        <div class="view-selector">
+          <button class="view-btn active" data-view="local">Local Changes</button>
+          <button class="view-btn" data-view="staged">Staged</button>
+          <button class="view-btn" data-view="history">History</button>
+        </div>
+
+        <!-- Commit List -->
+        <div class="commit-list" id="commitList">
+          <div class="loading">Loading...</div>
+        </div>
+      </aside>
+
+      <!-- Diff Viewer -->
+      <section class="diff-panel">
+        <div class="diff-header" id="diffHeader">
+          <h2>Select a commit or view local changes</h2>
+          <div class="diff-stats" id="diffStats"></div>
+        </div>
+        
+        <div class="diff-content" id="diffContent">
+          <div class="empty-state">
+            <div class="empty-icon">📂</div>
+            <p>Select a commit from the sidebar or view your local changes</p>
+          </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="quick-actions" id="quickActions" style="display: none;">
+          <button class="action-btn" id="explainBtn">
+            <span class="action-icon">💡</span>
+            Explain Changes
+          </button>
+          <button class="action-btn" id="reviewBtn">
+            <span class="action-icon">📋</span>
+            Code Review
+          </button>
+          <button class="action-btn" id="summaryBtn">
+            <span class="action-icon">📝</span>
+            Summary
+          </button>
+        </div>
+      </section>
+
+      <!-- Chat Panel -->
+      <aside class="chat-panel" id="chatPanel">
+        <div class="chat-header">
+          <h2>💬 Ask About Changes</h2>
+          <button class="btn btn-sm" id="clearChatBtn" title="Clear chat">Clear</button>
+        </div>
+
+        <div class="chat-messages" id="chatMessages">
+          <div class="chat-welcome">
+            <p>👋 Ask questions about the selected diff!</p>
+            <p class="hint">Try: "What does this change do?" or "Is there a bug here?"</p>
+          </div>
+        </div>
+
+        <form class="chat-input-form" id="chatForm">
+          <input 
+            type="text" 
+            class="chat-input" 
+            id="chatInput" 
+            placeholder="Ask about this diff..."
+            autocomplete="off"
+          >
+          <button type="submit" class="send-btn" id="sendBtn">
+            <span>→</span>
+          </button>
+        </form>
+      </aside>
+    </main>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

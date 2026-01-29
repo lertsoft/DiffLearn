@@ -10,10 +10,10 @@ DiffLearn helps developers understand code changes through an interactive termin
 
 - **🎨 Interactive Diff Viewer** - Red/green syntax highlighting with keyboard navigation
 - **💬 Click-to-Ask** - Select any change and ask questions about it
+- **🌐 Web UI** - Beautiful local web interface for viewing all commits and diffs
 - **🆓 Use Your Subscriptions** - Works with Gemini CLI, Claude Code, Cursor (no API fees!)
 - **🤖 API Support** - Also supports OpenAI, Anthropic, and Google APIs
 - **🔌 MCP Server** - Works with Cursor, Claude Code, Gemini CLI, OpenCode
-- **🌐 REST API** - Programmatic access for custom integrations
 - **📊 Multiple Modes** - Local changes, commits, branches, staged files
 
 
@@ -35,7 +35,10 @@ bun link
 ## Quick Start
 
 ```bash
-# View local changes interactively
+# 🌐 Launch the Web UI (recommended!)
+difflearn web
+
+# Terminal: View local changes interactively
 difflearn local
 
 # View staged changes only

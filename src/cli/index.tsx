@@ -234,12 +234,32 @@ program
         }
     });
 
+// Web UI - opens browser to local server
+program
+    .command('web')
+    .description('Launch the web UI in your browser')
+    .option('-p, --port <port>', 'Port for web server', '3000')
+    .action(async (options) => {
+        const port = parseInt(options.port, 10);
+        console.log(chalk.cyan(`\n🔍 Starting DiffLearn Web UI...\n`));
+
+        const { startAPIServer } = await import('../api/server');
+        await startAPIServer(port);
+
+        // Open browser
+        const url = `http://localhost:${port}`;
+        const openCmd = process.platform === 'darwin' ? 'open' :
+            process.platform === 'win32' ? 'start' : 'xdg-open';
+
+        Bun.spawn([openCmd, url]);
+    });
+
 // MCP server mode
 program
     .command('serve')
-    .description('Start as MCP or API server')
+    .description('Start as MCP, API, or Web UI server')
     .option('--mcp', 'Run as MCP server (for AI tools)')
-    .option('--api', 'Run as REST API server')
+    .option('--api', 'Run as REST API server (also serves web UI)')
     .option('-p, --port <port>', 'Port for API server', '3000')
     .action(async (options) => {
         if (options.mcp) {
@@ -248,11 +268,12 @@ program
             const { startMCPServer } = await import('../mcp/server');
             await startMCPServer();
         } else if (options.api) {
-            console.log(chalk.cyan(`🌐 Starting API server on port ${options.port}...`));
             const { startAPIServer } = await import('../api/server');
             await startAPIServer(parseInt(options.port, 10));
         } else {
             console.log(chalk.yellow('Please specify --mcp or --api'));
+            console.log(chalk.gray('  --mcp  Start MCP server for AI tool integration'));
+            console.log(chalk.gray('  --api  Start REST API server (also serves web UI)'));
         }
     });
 

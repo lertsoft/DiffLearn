@@ -1,11 +1,18 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { serveStatic } from 'hono/bun';
 import { GitExtractor, DiffFormatter } from '../git';
 import { loadConfig, isLLMAvailable } from '../config';
 import { LLMClient, SYSTEM_PROMPT, createExplainPrompt, createReviewPrompt, createQuestionPrompt, createSummaryPrompt } from '../llm';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
 const git = new GitExtractor(process.cwd());
 const formatter = new DiffFormatter();
+
+// Get the directory of this file for serving static files
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const webDir = join(__dirname, '../web');
 
 export async function startAPIServer(port: number = 3000) {
     const app = new Hono();
@@ -13,12 +20,42 @@ export async function startAPIServer(port: number = 3000) {
     // Enable CORS
     app.use('/*', cors());
 
-    // Health check
-    app.get('/', (c) => {
+    // Serve static files from web directory
+    app.get('/styles.css', async (c) => {
+        const file = Bun.file(join(webDir, 'styles.css'));
+        return new Response(file, {
+            headers: { 'Content-Type': 'text/css' },
+        });
+    });
+
+    app.get('/app.js', async (c) => {
+        const file = Bun.file(join(webDir, 'app.js'));
+        return new Response(file, {
+            headers: { 'Content-Type': 'application/javascript' },
+        });
+    });
+
+    // Health check / status endpoint
+    app.get('/', async (c) => {
+        // Check if this is an API request or browser request
+        const accept = c.req.header('Accept') || '';
+
+        if (accept.includes('text/html')) {
+            // Serve the web UI
+            const file = Bun.file(join(webDir, 'index.html'));
+            return new Response(file, {
+                headers: { 'Content-Type': 'text/html' },
+            });
+        }
+
+        // Return API status
+        const config = loadConfig();
         return c.json({
             name: 'difflearn',
             version: '0.1.0',
             status: 'running',
+            llmAvailable: isLLMAvailable(config),
+            llmProvider: config.provider,
         });
     });
 
@@ -291,7 +328,8 @@ export async function startAPIServer(port: number = 3000) {
         }
     });
 
-    console.log(`DiffLearn API server running on http://localhost:${port}`);
+    console.log(`\n🔍 DiffLearn Web UI running at http://localhost:${port}`);
+    console.log(`   API available at http://localhost:${port}/diff/local\n`);
 
     // Start server with Bun
     Bun.serve({
