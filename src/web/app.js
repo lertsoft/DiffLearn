@@ -66,6 +66,13 @@ async function checkLLMStatus() {
         statusDot.classList.add('error');
         statusText.textContent = 'API Error';
     }
+
+    if (result.cwd) {
+        const cwdEl = document.getElementById('cwdDisplay');
+        if (cwdEl) {
+            cwdEl.textContent = `You are seeing the Diffs for this directory: ${result.cwd}`;
+        }
+    }
 }
 
 async function fetchLocalDiff(staged = false) {

@@ -91,6 +91,7 @@ export async function startAPIServer(port: number = 3000) {
             status: 'running',
             llmAvailable: isLLMAvailable(config),
             llmProvider: config.provider,
+            cwd: process.cwd(),
         });
     });
 
@@ -363,14 +364,34 @@ export async function startAPIServer(port: number = 3000) {
         }
     });
 
-    console.log(`\n🔍 DiffLearn Web UI running at http://localhost:${port}`);
-    console.log(`   API available at http://localhost:${port}/diff/local\n`);
+    // Start server with Bun with retry logic for port
+    let server;
+    let currentPort = port;
+    const maxRetries = 10;
 
-    // Start server with Bun
-    Bun.serve({
-        port,
-        fetch: app.fetch,
-    });
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            server = Bun.serve({
+                port: currentPort,
+                fetch: app.fetch,
+            });
+            break;
+        } catch (e: any) {
+            if (e.code === 'EADDRINUSE' || e.message?.includes('Address already in use') || e.code === 'SystemError') {
+                console.log(`Port ${currentPort} is in use, trying ${currentPort + 1}...`);
+                currentPort++;
+            } else {
+                throw e;
+            }
+        }
+    }
+
+    if (!server) {
+        throw new Error(`Could not find an open port after ${maxRetries} attempts.`);
+    }
+
+    console.log(`\n🔍 DiffLearn Web UI running at http://localhost:${currentPort}`);
+    console.log(`   API available at http://localhost:${currentPort}/diff/local\n`);
 }
 
 // Run if called directly

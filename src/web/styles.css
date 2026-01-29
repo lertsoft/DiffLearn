@@ -99,6 +99,21 @@ body {
   gap: 16px;
 }
 
+
+
+.brand-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.cwd-display {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-left: 2px;
+  font-weight: 500;
+}
+
 .logo {
   display: flex;
   align-items: center;
@@ -414,6 +429,17 @@ body {
   color: var(--text-muted);
   background: var(--diff-hunk-bg);
   cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.hunk-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .hunk-header:hover {
@@ -421,7 +447,10 @@ body {
 }
 
 .hunk-header .ask-btn {
-  float: right;
+  /* float: right; remove float */
+  display: flex;
+  align-items: center;
+  gap: 4px;
   padding: 2px 8px;
   font-size: 11px;
   background: var(--accent);
@@ -431,6 +460,10 @@ body {
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.15s;
+}
+
+.ask-icon {
+  display: none;
 }
 
 .hunk-header:hover .ask-btn {
@@ -1175,33 +1208,47 @@ body {
    ============================================ */
 
 .mobile-chat-toggle {
+  /* We will hide this in favor of header button on mobile layout */
+  display: none !important;
+}
+
+.header-chat-btn {
   display: none;
-  position: fixed;
-  bottom: 120px;
-  /* Above the sidebar peek */
-  right: 20px;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: var(--accent);
-  color: white;
-  border: none;
-  font-size: 24px;
-  box-shadow: var(--shadow-md);
-  cursor: pointer;
-  z-index: 45;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
   align-items: center;
   justify-content: center;
-  transition: transform 0.2s, background 0.2s;
+  cursor: pointer;
+  margin-left: 8px;
+  font-size: 16px;
+  color: var(--text-primary);
 }
 
-.mobile-chat-toggle:hover {
-  background: var(--accent-hover);
-  transform: scale(1.05);
+@media (max-width: 900px) {
+  .header-chat-btn.mobile-only {
+    display: flex;
+  }
 }
 
-.mobile-chat-toggle:active {
-  transform: scale(0.95);
+@media (max-width: 700px) {
+  .ask-text {
+    display: none;
+  }
+
+  .ask-icon {
+    display: block;
+    font-size: 14px;
+  }
+
+  .hunk-header .ask-btn {
+    opacity: 1;
+    /* Always show on mobile */
+    padding: 4px 6px;
+    /* remove static height if icon only */
+  }
 }
 
 /* Chat panel close button for mobile */
