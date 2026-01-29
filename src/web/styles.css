@@ -886,6 +886,11 @@ body {
   /* Header adjustments */
   .header {
     padding: 0 12px;
+    padding-top: env(safe-area-inset-top);
+    height: auto;
+    min-height: calc(var(--header-height) + env(safe-area-inset-top));
+    align-items: center;
+    /* keep center vertically */
   }
 
   .logo {
@@ -1030,8 +1035,12 @@ body {
   .hunk-header .ask-btn {
     opacity: 1;
     /* Always show on mobile */
-    padding: 4px 10px;
+    padding: 2px 8px;
+    /* Smaller */
     font-size: 10px;
+    height: 24px;
+    display: flex;
+    align-items: center;
   }
 
   .diff-line {
@@ -1048,19 +1057,17 @@ body {
     padding: 0 8px;
   }
 
-  /* Quick actions become bottom bar */
+  /* Quick actions become static at bottom of content */
   .quick-actions {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    padding: 8px 12px;
-    padding-bottom: max(8px, env(safe-area-inset-bottom));
-    gap: 6px;
-    z-index: 40;
-    justify-content: space-around;
-    border-radius: 12px 12px 0 0;
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+    position: static;
+    /* Not fixed */
+    margin-top: 20px;
+    padding: 12px;
+    gap: 8px;
+    border-radius: 8px;
+    box-shadow: none;
+    border-top: 1px solid var(--border);
+    background: var(--bg-secondary);
   }
 
   .action-btn {
@@ -1170,8 +1177,9 @@ body {
 .mobile-chat-toggle {
   display: none;
   position: fixed;
-  bottom: 70px;
-  right: 16px;
+  bottom: 120px;
+  /* Above the sidebar peek */
+  right: 20px;
   width: 56px;
   height: 56px;
   border-radius: 50%;
@@ -1286,6 +1294,8 @@ body {
     .header {
       padding-left: max(12px, env(safe-area-inset-left));
       padding-right: max(12px, env(safe-area-inset-right));
+      padding-top: max(5px, env(safe-area-inset-top));
+      /* Ensure min spacing */
     }
 
     .sidebar {
