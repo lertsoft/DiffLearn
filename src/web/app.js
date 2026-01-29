@@ -311,13 +311,22 @@ function renderDiffLine(line) {
 // Chat Functions
 // ============================================
 
-function addMessage(role, content) {
+function getContextLabel() {
+    if (currentView === 'history' && currentCommit) {
+        return `Commit ${currentCommit.slice(0, 7)}`;
+    }
+    return currentView === 'staged' ? 'Staged Changes' : 'Local Changes';
+}
+
+function addMessage(role, content, meta = null) {
     const icon = role === 'user' ? '👤' : '🤖';
     const label = role === 'user' ? 'You' : 'DiffLearn';
 
     // Remove welcome message
     const welcome = elements.chatMessages.querySelector('.chat-welcome');
     if (welcome) welcome.remove();
+
+    const metaHtml = meta ? `<div class="message-meta">${escapeHtml(meta)}</div>` : '';
 
     const messageEl = document.createElement('div');
     messageEl.className = `message ${role}`;
@@ -333,6 +342,7 @@ function addMessage(role, content) {
       <span>${icon}</span>
       <span>${label}</span>
     </div>
+    ${metaHtml}
     <div class="message-content">${renderedContent}</div>
   `;
 
@@ -368,10 +378,11 @@ function removeLoadingMessage() {
     if (loading) loading.remove();
 }
 
-async function handleChat(question) {
+async function handleChat(question, contextOverride = null) {
     if (!question.trim()) return;
 
-    addMessage('user', question);
+    const context = contextOverride || getContextLabel();
+    addMessage('user', question, context);
     elements.chatInput.value = '';
     elements.sendBtn.disabled = true;
 
@@ -400,7 +411,7 @@ async function handleChat(question) {
 
 async function askAboutHunk(fileName, hunkIndex) {
     const question = `Please explain the changes in file "${fileName}", specifically the hunk at position ${hunkIndex}. What does this change do?`;
-    await handleChat(question);
+    await handleChat(question, `File: ${fileName}`);
 }
 
 function clearChat() {
@@ -427,7 +438,7 @@ async function handleQuickAction(action) {
         summary: 'Please provide a summary of these changes.'
     };
 
-    addMessage('user', questions[action] || `Action: ${action}`);
+    addMessage('user', questions[action] || `Action: ${action}`, getContextLabel());
 
     btn.disabled = true;
     btn.innerHTML = '<span class="action-icon">⏳</span> Loading...';
