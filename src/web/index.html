@@ -23,19 +23,22 @@
     <header class="header">
       <div class="header-left">
         <div class="brand-container">
-          <h1 class="logo">
-            <span class="logo-icon">🔍</span>
-            DiffLearn
-          </h1>
+          <div class="brand-row">
+            <h1 class="logo">
+              <span class="logo-icon">🔍</span>
+              DiffLearn
+            </h1>
+            <span class="tagline">Git Diff Learning Tool</span>
+          </div>
           <div id="cwdDisplay" class="cwd-display"></div>
         </div>
-        <span class="tagline">Git Diff Learning Tool</span>
       </div>
       <div class="header-right">
         <div class="llm-status" id="llmStatus">
           <span class="status-dot"></span>
           <span class="status-text">Checking AI...</span>
         </div>
+        <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle Theme">☀️</button>
         <button class="header-chat-btn mobile-only" id="headerChatBtn" title="Chat">💬</button>
       </div>
     </header>

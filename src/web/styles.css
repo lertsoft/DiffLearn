@@ -48,6 +48,45 @@
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
+:root[data-theme="light"] {
+  /* Colors - Light Theme */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f6f8fa;
+  --bg-tertiary: #eaeef2;
+  --bg-hover: #f3f4f6;
+
+  --text-primary: #050505;
+  /* Blacker */
+  --text-secondary: #404040;
+  /* Dark Gray */
+  --text-muted: #6e7781;
+
+  --accent: #0969da;
+  --accent-hover: #218bff;
+
+  --success: #1a7f37;
+  --success-bg: #dafbe1;
+  --danger: #cf222e;
+  --danger-bg: #ffebe9;
+  --warning: #9a6700;
+  --warning-bg: #fff8c5;
+
+  --border: #d0d7de;
+  --border-subtle: #d8dee4;
+
+  /* Diff Colors */
+  --diff-add-bg: #e6ffec;
+  --diff-add-text: #1a7f37;
+  --diff-del-bg: #ffebe9;
+  --diff-del-text: #cf222e;
+  --diff-hunk-bg: #ddf4ff;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+}
+
 /* ============================================
    Reset & Base
    ============================================ */
@@ -99,6 +138,12 @@ body {
   gap: 16px;
 }
 
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 
 
 .brand-container {
@@ -107,11 +152,18 @@ body {
   justify-content: center;
 }
 
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
 .cwd-display {
   font-size: 10px;
   color: var(--text-muted);
   margin-left: 2px;
   font-weight: 500;
+  margin-top: 4px;
 }
 
 .logo {
@@ -318,19 +370,29 @@ body {
   background: var(--bg-primary);
 }
 
-.diff-header {
+.sidebar-header,
+.diff-header,
+.chat-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
+  padding: 0 16px;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  height: 56px;
 }
 
-.diff-header h2 {
-  font-size: 15px;
+.sidebar-header h2,
+.diff-header h2,
+.chat-header h2 {
+  font-size: 14px;
   font-weight: 600;
+  margin: 0;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .diff-stats {
@@ -1210,6 +1272,26 @@ body {
 .mobile-chat-toggle {
   /* We will hide this in favor of header button on mobile layout */
   display: none !important;
+  display: none !important;
+}
+
+.theme-toggle-btn {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-right: 8px;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+.theme-toggle-btn:hover {
+  background: var(--bg-hover);
 }
 
 .header-chat-btn {

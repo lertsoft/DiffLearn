@@ -665,7 +665,40 @@ window.addEventListener('resize', () => {
 // Initialize
 // ============================================
 
+function initTheme() {
+    const themeToggleBtn = document.getElementById('themeToggleBtn');
+    if (!themeToggleBtn) return;
+
+    const saved = localStorage.getItem('theme');
+
+    // Default is dark (no attribute)
+    // If saved is light, switch to light
+    if (saved === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+        themeToggleBtn.textContent = '🌙';
+    } else {
+        document.documentElement.removeAttribute('data-theme');
+        themeToggleBtn.textContent = '☀️';
+    }
+
+    themeToggleBtn.addEventListener('click', () => {
+        const current = document.documentElement.getAttribute('data-theme');
+        if (current === 'light') {
+            // Switch to Dark
+            document.documentElement.removeAttribute('data-theme');
+            themeToggleBtn.textContent = '☀️';
+            localStorage.setItem('theme', 'dark');
+        } else {
+            // Switch to Light
+            document.documentElement.setAttribute('data-theme', 'light');
+            themeToggleBtn.textContent = '🌙';
+            localStorage.setItem('theme', 'light');
+        }
+    });
+}
+
 async function init() {
+    initTheme();
     await checkLLMStatus();
     await renderCommitList();
 }
