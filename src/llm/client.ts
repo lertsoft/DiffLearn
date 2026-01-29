@@ -1,7 +1,8 @@
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { Config, LLMProvider } from '../config';
+import { Config, LLMProvider, getCLICommand } from '../config';
+import { spawn } from 'child_process';
 
 export interface ChatMessage {
     role: 'user' | 'assistant' | 'system';
@@ -28,6 +29,9 @@ export class LLMClient {
     }
 
     private initializeClient() {
+        // Skip SDK initialization for CLI-based providers
+        if (this.config.useCLI) return;
+
         switch (this.config.provider) {
             case 'openai':
                 this.openaiClient = new OpenAI({ apiKey: this.config.apiKey });
@@ -45,6 +49,11 @@ export class LLMClient {
      * Send a chat request to the LLM
      */
     async chat(messages: ChatMessage[]): Promise<LLMResponse> {
+        // Use CLI-based providers
+        if (this.config.useCLI) {
+            return this.chatCLI(messages);
+        }
+
         switch (this.config.provider) {
             case 'openai':
                 return this.chatOpenAI(messages);
@@ -55,6 +64,131 @@ export class LLMClient {
             default:
                 throw new Error(`Unknown provider: ${this.config.provider}`);
         }
+    }
+
+    /**
+     * Chat using CLI tools (gemini, claude, cursor-agent)
+     */
+    private async chatCLI(messages: ChatMessage[]): Promise<LLMResponse> {
+        const command = getCLICommand(this.config.provider);
+        if (!command) {
+            throw new Error(`No CLI command for provider: ${this.config.provider}`);
+        }
+
+        // Combine messages into a single prompt
+        const systemMessage = messages.find(m => m.role === 'system')?.content || '';
+        const userMessages = messages.filter(m => m.role !== 'system');
+
+        const prompt = userMessages.map(m =>
+            `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`
+        ).join('\n\n');
+
+        const fullPrompt = systemMessage ? `${systemMessage}\n\n${prompt}` : prompt;
+
+        // Execute appropriate CLI
+        let result: string;
+        switch (this.config.provider) {
+            case 'gemini-cli':
+                result = await this.execGeminiCLI(fullPrompt);
+                break;
+            case 'claude-cli':
+                result = await this.execClaudeCLI(fullPrompt);
+                break;
+            case 'cursor-cli':
+                result = await this.execCursorCLI(fullPrompt);
+                break;
+            default:
+                throw new Error(`Unknown CLI provider: ${this.config.provider}`);
+        }
+
+        return { content: result };
+    }
+
+    /**
+     * Execute Gemini CLI: gemini -p "prompt"
+     */
+    private async execGeminiCLI(prompt: string): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const proc = spawn('gemini', ['-p', prompt], {
+                stdio: ['pipe', 'pipe', 'pipe'],
+            });
+
+            let stdout = '';
+            let stderr = '';
+
+            proc.stdout.on('data', (data) => { stdout += data.toString(); });
+            proc.stderr.on('data', (data) => { stderr += data.toString(); });
+
+            proc.on('close', (code) => {
+                if (code === 0) {
+                    resolve(stdout.trim());
+                } else {
+                    reject(new Error(`Gemini CLI failed: ${stderr || stdout}`));
+                }
+            });
+
+            proc.on('error', (err) => {
+                reject(new Error(`Failed to run gemini: ${err.message}. Is Gemini CLI installed?`));
+            });
+        });
+    }
+
+    /**
+     * Execute Claude Code CLI: claude -p "prompt" --output-format text
+     */
+    private async execClaudeCLI(prompt: string): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const proc = spawn('claude', ['-p', prompt, '--output-format', 'text'], {
+                stdio: ['pipe', 'pipe', 'pipe'],
+            });
+
+            let stdout = '';
+            let stderr = '';
+
+            proc.stdout.on('data', (data) => { stdout += data.toString(); });
+            proc.stderr.on('data', (data) => { stderr += data.toString(); });
+
+            proc.on('close', (code) => {
+                if (code === 0) {
+                    resolve(stdout.trim());
+                } else {
+                    reject(new Error(`Claude CLI failed: ${stderr || stdout}`));
+                }
+            });
+
+            proc.on('error', (err) => {
+                reject(new Error(`Failed to run claude: ${err.message}. Is Claude Code CLI installed?`));
+            });
+        });
+    }
+
+    /**
+     * Execute Cursor CLI: cursor-agent chat "prompt"
+     */
+    private async execCursorCLI(prompt: string): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const proc = spawn('cursor-agent', ['chat', prompt], {
+                stdio: ['pipe', 'pipe', 'pipe'],
+            });
+
+            let stdout = '';
+            let stderr = '';
+
+            proc.stdout.on('data', (data) => { stdout += data.toString(); });
+            proc.stderr.on('data', (data) => { stderr += data.toString(); });
+
+            proc.on('close', (code) => {
+                if (code === 0) {
+                    resolve(stdout.trim());
+                } else {
+                    reject(new Error(`Cursor CLI failed: ${stderr || stdout}`));
+                }
+            });
+
+            proc.on('error', (err) => {
+                reject(new Error(`Failed to run cursor-agent: ${err.message}. Is Cursor CLI installed?`));
+            });
+        });
     }
 
     private async chatOpenAI(messages: ChatMessage[]): Promise<LLMResponse> {
@@ -135,6 +269,13 @@ export class LLMClient {
      * Stream chat responses (for real-time display)
      */
     async *streamChat(messages: ChatMessage[]): AsyncGenerator<string> {
+        // CLI-based providers don't support streaming, return full response
+        if (this.config.useCLI) {
+            const response = await this.chatCLI(messages);
+            yield response.content;
+            return;
+        }
+
         switch (this.config.provider) {
             case 'openai':
                 yield* this.streamOpenAI(messages);
