@@ -12,6 +12,7 @@ let currentDiff = null;
 let currentCommit = null;
 let commits = [];
 let pendingContext = null;
+let selectedForCompare = []; // Array of commit hashes selected for comparison (max 2)
 
 // DOM Elements
 const elements = {
@@ -25,6 +26,7 @@ const elements = {
     explainBtn: document.getElementById('explainBtn'),
     reviewBtn: document.getElementById('reviewBtn'),
     summaryBtn: document.getElementById('summaryBtn'),
+    exportBtn: document.getElementById('exportBtn'),
     chatPanel: document.getElementById('chatPanel'),
     chatMessages: document.getElementById('chatMessages'),
     chatForm: document.getElementById('chatForm'),
@@ -163,24 +165,91 @@ async function renderHistoryList() {
 
     commits = result.data;
 
-    elements.commitList.innerHTML = commits.map((commit, index) => `
-    <div class="commit-item ${index === 0 ? 'active' : ''}" 
+    // Build the compare bar if commits are selected
+    let compareBarHtml = '';
+    if (selectedForCompare.length > 0) {
+        const selectedCommits = selectedForCompare.map(hash => {
+            const c = commits.find(commit => commit.hash === hash);
+            return c ? { hash: c.hash, message: c.message.split('\n')[0].slice(0, 30) } : { hash, message: hash.slice(0, 7) };
+        });
+
+        compareBarHtml = `
+        <div class="compare-bar" id="compareBar">
+            <div class="compare-info">
+                <span class="compare-label">🔀 Compare:</span>
+                ${selectedCommits.map((c, i) => `
+                    <span class="compare-commit" data-hash="${c.hash}">
+                        <span class="compare-hash">${c.hash.slice(0, 7)}</span>
+                        <button class="compare-remove" data-hash="${c.hash}" title="Remove">×</button>
+                    </span>
+                    ${i === 0 && selectedCommits.length === 2 ? '<span class="compare-vs">vs</span>' : ''}
+                `).join('')}
+            </div>
+            <div class="compare-actions">
+                ${selectedForCompare.length === 2 ? '<button class="compare-go-btn" id="compareGoBtn">Compare</button>' : '<span class="compare-hint">Select another commit</span>'}
+                <button class="compare-clear-btn" id="compareClearBtn">Clear</button>
+            </div>
+        </div>
+        `;
+    }
+
+    elements.commitList.innerHTML = compareBarHtml + commits.map((commit, index) => {
+        const isSelected = selectedForCompare.includes(commit.hash);
+        const canSelect = selectedForCompare.length < 2 || isSelected;
+
+        return `
+    <div class="commit-item ${index === 0 && selectedForCompare.length === 0 ? 'active' : ''} ${isSelected ? 'compare-selected' : ''}" 
          data-type="commit" 
          data-sha="${commit.hash}"
          role="option"
          tabindex="0"
-         aria-selected="${index === 0 ? 'true' : 'false'}">
-      <div class="commit-hash">${commit.hash.slice(0, 7)}</div>
-      <div class="commit-message">${escapeHtml(commit.message.split('\n')[0])}</div>
-      <div class="commit-meta">
-        <span>${formatDate(commit.date)}</span>
-        <span>${escapeHtml(commit.author)}</span>
+         aria-selected="${index === 0 && selectedForCompare.length === 0 ? 'true' : 'false'}">
+      <button class="compare-btn ${isSelected ? 'selected' : ''} ${!canSelect ? 'disabled' : ''}" 
+              data-sha="${commit.hash}" 
+              title="${isSelected ? 'Remove from compare' : 'Add to compare'}"
+              ${!canSelect ? 'disabled' : ''}>
+        ${isSelected ? '✓' : '+'}
+      </button>
+      <div class="commit-content">
+        <div class="commit-hash">${commit.hash.slice(0, 7)}</div>
+        <div class="commit-message">${escapeHtml(commit.message.split('\n')[0])}</div>
+        <div class="commit-meta">
+          <span>${formatDate(commit.date)}</span>
+          <span>${escapeHtml(commit.author)}</span>
+        </div>
       </div>
     </div>
-  `).join('');
+  `;
+    }).join('');
 
-    // Auto-load first commit
-    if (commits.length > 0) {
+    // Add compare bar event listeners
+    const compareGoBtn = document.getElementById('compareGoBtn');
+    const compareClearBtn = document.getElementById('compareClearBtn');
+
+    if (compareGoBtn) {
+        compareGoBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            loadComparisonDiff();
+        });
+    }
+
+    if (compareClearBtn) {
+        compareClearBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            clearCompareSelection();
+        });
+    }
+
+    // Add remove button listeners
+    document.querySelectorAll('.compare-remove').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleCompareCommit(btn.dataset.hash);
+        });
+    });
+
+    // Auto-load first commit if no compare selection
+    if (commits.length > 0 && selectedForCompare.length === 0) {
         await loadCommitDiff(commits[0].hash);
     }
 }
@@ -408,6 +477,15 @@ function removeLoadingMessage() {
 async function handleChat(question, contextOverride = null) {
     if (!question.trim()) return;
 
+    // Check for slash commands first
+    if (question.trim().startsWith('/')) {
+        const handled = handleSlashCommand(question);
+        if (handled) {
+            elements.chatInput.value = '';
+            return;
+        }
+    }
+
     let context = contextOverride;
     if (!context) {
         context = pendingContext || getContextLabel();
@@ -520,6 +598,125 @@ async function handleQuickAction(action) {
 }
 
 // ============================================
+// Export Function
+// ============================================
+
+function handleExport() {
+    if (!currentDiff) {
+        addMessage('assistant', '⚠️ No diff to export. Select local/staged changes or a commit first.');
+        return;
+    }
+
+    const { summary, files } = currentDiff;
+
+    // Generate markdown export
+    let markdown = `# Diff Export\n\n`;
+    markdown += `**Summary:** ${summary.files} file(s), +${summary.additions}/-${summary.deletions}\n\n`;
+
+    if (currentCommit) {
+        markdown += `**Commit:** ${currentCommit}\n\n`;
+    } else {
+        markdown += `**View:** ${currentView === 'staged' ? 'Staged Changes' : 'Local Changes'}\n\n`;
+    }
+
+    markdown += `---\n\n`;
+
+    files.forEach(file => {
+        const status = file.isNew ? '[NEW]' : file.isDeleted ? '[DEL]' : file.isRenamed ? '[REN]' : '[MOD]';
+        markdown += `## ${status} ${file.newFile || file.oldFile}\n\n`;
+        markdown += `+${file.additions}/-${file.deletions}\n\n`;
+
+        file.hunks.forEach(hunk => {
+            markdown += `\`\`\`diff\n${hunk.header}\n`;
+            hunk.lines.forEach(line => {
+                const prefix = line.type === 'add' ? '+' : line.type === 'delete' ? '-' : ' ';
+                markdown += `${prefix}${line.content}\n`;
+            });
+            markdown += `\`\`\`\n\n`;
+        });
+    });
+
+    // Create download
+    const blob = new Blob([markdown], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `diff-export-${Date.now()}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    addMessage('assistant', '📤 Diff exported as markdown file!');
+}
+
+// ============================================
+// Slash Command Handling
+// ============================================
+
+const SLASH_COMMANDS = [
+    { cmd: '/explain', desc: 'Get AI explanation of changes', action: 'explain' },
+    { cmd: '/review', desc: 'Get AI code review', action: 'review' },
+    { cmd: '/summarize', desc: 'Get AI summary of changes', action: 'summary' },
+    { cmd: '/export', desc: 'Export diff as markdown', action: 'export' },
+    { cmd: '/local', desc: 'Switch to local changes view', action: 'local' },
+    { cmd: '/staged', desc: 'Switch to staged changes view', action: 'staged' },
+    { cmd: '/history', desc: 'Switch to commit history view', action: 'history' },
+    { cmd: '/clear', desc: 'Clear chat messages', action: 'clear' },
+];
+
+function handleSlashCommand(input) {
+    const cmd = input.trim().toLowerCase();
+
+    // Find matching command
+    const match = SLASH_COMMANDS.find(c => c.cmd === cmd);
+    if (!match) {
+        // Show available commands
+        if (cmd === '/') {
+            let helpText = '**Available Commands:**\n\n';
+            SLASH_COMMANDS.forEach(c => {
+                helpText += `\`${c.cmd}\` - ${c.desc}\n`;
+            });
+            addMessage('assistant', helpText);
+            return true;
+        }
+        return false;
+    }
+
+    switch (match.action) {
+        case 'explain':
+        case 'review':
+        case 'summary':
+            if (!currentDiff || !currentDiff.files || currentDiff.files.length === 0) {
+                addMessage('assistant', '⚠️ No changes to analyze. Select local/staged changes or a commit with content first.');
+            } else {
+                handleQuickAction(match.action);
+            }
+            break;
+        case 'export':
+            handleExport();
+            break;
+        case 'local':
+            document.querySelector('[data-view="local"]')?.click();
+            addMessage('assistant', '📝 Switched to Local Changes view');
+            break;
+        case 'staged':
+            document.querySelector('[data-view="staged"]')?.click();
+            addMessage('assistant', '📦 Switched to Staged Changes view');
+            break;
+        case 'history':
+            document.querySelector('[data-view="history"]')?.click();
+            addMessage('assistant', '📜 Switched to Commit History view');
+            break;
+        case 'clear':
+            clearChat();
+            break;
+    }
+
+    return true;
+}
+
+// ============================================
 // Utility Functions
 // ============================================
 
@@ -544,6 +741,69 @@ function formatDate(dateStr) {
 }
 
 // ============================================
+// Compare Functions
+// ============================================
+
+function toggleCompareCommit(hash) {
+    const index = selectedForCompare.indexOf(hash);
+    if (index >= 0) {
+        // Remove from selection
+        selectedForCompare.splice(index, 1);
+    } else if (selectedForCompare.length < 2) {
+        // Add to selection
+        selectedForCompare.push(hash);
+    }
+    // Re-render to update UI
+    renderHistoryList();
+}
+
+function clearCompareSelection() {
+    selectedForCompare = [];
+    renderHistoryList();
+}
+
+async function loadComparisonDiff() {
+    if (selectedForCompare.length !== 2) return;
+
+    const [sha1, sha2] = selectedForCompare;
+    elements.diffContent.innerHTML = '<div class="loading">Loading comparison...</div>';
+
+    try {
+        const result = await fetchJSON(`/diff/commit/${sha1}?compare=${sha2}`);
+
+        if (!result.success) {
+            elements.diffContent.innerHTML = `
+              <div class="empty-state">
+                <div class="empty-icon">❌</div>
+                <p>Error loading comparison: ${result.error}</p>
+              </div>
+            `;
+            return;
+        }
+
+        currentDiff = result.data;
+        currentCommit = `${sha1}..${sha2}`;
+
+        const commit1 = commits.find(c => c.hash === sha1);
+        const commit2 = commits.find(c => c.hash === sha2);
+        const title1 = commit1 ? commit1.message.split('\n')[0].slice(0, 25) : sha1.slice(0, 7);
+        const title2 = commit2 ? commit2.message.split('\n')[0].slice(0, 25) : sha2.slice(0, 7);
+
+        renderDiff(result.data, `${sha1.slice(0, 7)} vs ${sha2.slice(0, 7)}`);
+
+        // Show comparison info in chat
+        addMessage('assistant', `🔀 **Comparing commits:**\n\n**From:** \`${sha1.slice(0, 7)}\` - ${title1}\n\n**To:** \`${sha2.slice(0, 7)}\` - ${title2}\n\n${result.data.summary.files} file(s) changed, +${result.data.summary.additions}/-${result.data.summary.deletions}`);
+    } catch (error) {
+        elements.diffContent.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">❌</div>
+            <p>Error: ${error.message}</p>
+          </div>
+        `;
+    }
+}
+
+// ============================================
 // Event Handlers
 // ============================================
 
@@ -559,6 +819,17 @@ elements.viewBtns.forEach(btn => {
 
 // Commit list clicks
 elements.commitList.addEventListener('click', async (e) => {
+    // Check if clicking a compare button
+    const compareBtn = e.target.closest('.compare-btn');
+    if (compareBtn) {
+        e.stopPropagation();
+        const sha = compareBtn.dataset.sha;
+        if (sha) {
+            toggleCompareCommit(sha);
+        }
+        return;
+    }
+
     const item = e.target.closest('.commit-item');
     if (!item) return;
 
@@ -588,6 +859,9 @@ elements.clearChatBtn.addEventListener('click', clearChat);
 elements.explainBtn.addEventListener('click', () => handleQuickAction('explain'));
 elements.reviewBtn.addEventListener('click', () => handleQuickAction('review'));
 elements.summaryBtn.addEventListener('click', () => handleQuickAction('summary'));
+if (elements.exportBtn) {
+    elements.exportBtn.addEventListener('click', handleExport);
+}
 
 // ============================================
 // Mobile Interactions

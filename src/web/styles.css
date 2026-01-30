@@ -379,6 +379,183 @@ body {
   background: linear-gradient(135deg, var(--bg-tertiary), rgba(88, 166, 255, 0.1));
 }
 
+/* Compare Button in Commit List */
+.commit-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.commit-item .commit-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.compare-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: bold;
+  color: var(--text-secondary);
+  background: var(--bg-primary);
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-top: 2px;
+}
+
+.compare-btn:hover:not(.disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: scale(1.1);
+}
+
+.compare-btn.selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.compare-btn.disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.commit-item.compare-selected {
+  border-color: var(--accent);
+  background: rgba(88, 166, 255, 0.15);
+}
+
+/* Compare Bar */
+.compare-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  background: linear-gradient(135deg, rgba(88, 166, 255, 0.15), rgba(136, 87, 229, 0.15));
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.compare-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.compare-label {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.compare-commit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.compare-hash {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.compare-remove {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.compare-remove:hover {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.compare-vs {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.compare-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.compare-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.compare-go-btn {
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: white;
+  background: linear-gradient(135deg, var(--accent), #a855f7);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.compare-go-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(88, 166, 255, 0.4);
+}
+
+.compare-clear-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.compare-clear-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
 .loading,
 .empty-state {
   display: flex;
