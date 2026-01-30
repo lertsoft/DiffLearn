@@ -70,11 +70,6 @@ export class LLMClient {
      * Chat using CLI tools (gemini, claude, cursor-agent)
      */
     private async chatCLI(messages: ChatMessage[]): Promise<LLMResponse> {
-        const command = getCLICommand(this.config.provider);
-        if (!command) {
-            throw new Error(`No CLI command for provider: ${this.config.provider}`);
-        }
-
         // Combine messages into a single prompt
         const systemMessage = messages.find(m => m.role === 'system')?.content || '';
         const userMessages = messages.filter(m => m.role !== 'system');
@@ -91,11 +86,14 @@ export class LLMClient {
             case 'gemini-cli':
                 result = await this.execGeminiCLI(fullPrompt);
                 break;
-            case 'claude-cli':
+            case 'claude-code':
                 result = await this.execClaudeCLI(fullPrompt);
                 break;
             case 'cursor-cli':
                 result = await this.execCursorCLI(fullPrompt);
+                break;
+            case 'codex':
+                result = await this.execCodexCLI(fullPrompt);
                 break;
             default:
                 throw new Error(`Unknown CLI provider: ${this.config.provider}`);
@@ -105,69 +103,39 @@ export class LLMClient {
     }
 
     /**
-     * Execute Gemini CLI: gemini -p "prompt"
+     * Execute Gemini CLI: gemini prompt (via stdin)
      */
     private async execGeminiCLI(prompt: string): Promise<string> {
-        return new Promise((resolve, reject) => {
-            const proc = spawn('gemini', ['-p', prompt], {
-                stdio: ['pipe', 'pipe', 'pipe'],
-            });
-
-            let stdout = '';
-            let stderr = '';
-
-            proc.stdout.on('data', (data) => { stdout += data.toString(); });
-            proc.stderr.on('data', (data) => { stderr += data.toString(); });
-
-            proc.on('close', (code) => {
-                if (code === 0) {
-                    resolve(stdout.trim());
-                } else {
-                    reject(new Error(`Gemini CLI failed: ${stderr || stdout}`));
-                }
-            });
-
-            proc.on('error', (err) => {
-                reject(new Error(`Failed to run gemini: ${err.message}. Is Gemini CLI installed?`));
-            });
-        });
+        return this.execCLIWithStdin('gemini', [], prompt);
     }
 
     /**
-     * Execute Claude Code CLI: claude -p "prompt" --output-format text
+     * Execute Claude Code CLI: claude -p "prompt"
      */
     private async execClaudeCLI(prompt: string): Promise<string> {
-        return new Promise((resolve, reject) => {
-            const proc = spawn('claude', ['-p', prompt, '--output-format', 'text'], {
-                stdio: ['pipe', 'pipe', 'pipe'],
-            });
-
-            let stdout = '';
-            let stderr = '';
-
-            proc.stdout.on('data', (data) => { stdout += data.toString(); });
-            proc.stderr.on('data', (data) => { stderr += data.toString(); });
-
-            proc.on('close', (code) => {
-                if (code === 0) {
-                    resolve(stdout.trim());
-                } else {
-                    reject(new Error(`Claude CLI failed: ${stderr || stdout}`));
-                }
-            });
-
-            proc.on('error', (err) => {
-                reject(new Error(`Failed to run claude: ${err.message}. Is Claude Code CLI installed?`));
-            });
-        });
+        return this.execCLIWithStdin('claude', ['-p', prompt], '');
     }
 
     /**
      * Execute Cursor CLI: cursor-agent chat "prompt"
      */
     private async execCursorCLI(prompt: string): Promise<string> {
+        return this.execCLIWithStdin('cursor-agent', ['chat', prompt], '');
+    }
+
+    /**
+     * Execute Codex CLI
+     */
+    private async execCodexCLI(prompt: string): Promise<string> {
+        return this.execCLIWithStdin('codex', [], prompt);
+    }
+
+    /**
+     * Helper to execute CLI command with stdin
+     */
+    private async execCLIWithStdin(command: string, args: string[], input: string): Promise<string> {
         return new Promise((resolve, reject) => {
-            const proc = spawn('cursor-agent', ['chat', prompt], {
+            const proc = spawn(command, args, {
                 stdio: ['pipe', 'pipe', 'pipe'],
             });
 
@@ -181,13 +149,18 @@ export class LLMClient {
                 if (code === 0) {
                     resolve(stdout.trim());
                 } else {
-                    reject(new Error(`Cursor CLI failed: ${stderr || stdout}`));
+                    reject(new Error(`${command} failed (code ${code}): ${stderr || stdout}`));
                 }
             });
 
             proc.on('error', (err) => {
-                reject(new Error(`Failed to run cursor-agent: ${err.message}. Is Cursor CLI installed?`));
+                reject(new Error(`Failed to run ${command}: ${err.message}`));
             });
+
+            if (input) {
+                proc.stdin.write(input);
+                proc.stdin.end();
+            }
         });
     }
 
@@ -228,12 +201,13 @@ export class LLMClient {
                 role: m.role as 'user' | 'assistant',
                 content: m.content,
             })),
+            temperature: this.config.temperature,
         });
 
-        const textContent = response.content.find(c => c.type === 'text');
+        const textContent = response.content[0].type === 'text' ? response.content[0].text : '';
 
         return {
-            content: textContent?.type === 'text' ? textContent.text : '',
+            content: textContent,
             usage: {
                 inputTokens: response.usage.input_tokens,
                 outputTokens: response.usage.output_tokens,
@@ -246,13 +220,12 @@ export class LLMClient {
 
         const model = this.googleClient.getGenerativeModel({ model: this.config.model });
 
-        // Extract system message and format history
-        const systemMessage = messages.find(m => m.role === 'system')?.content || '';
+        // Convert messages to Google format
+        const systemMessage = messages.find(m => m.role === 'system')?.content;
         const chatMessages = messages.filter(m => m.role !== 'system');
 
-        // Format as a single prompt for simplicity
         const prompt = chatMessages.map(m =>
-            `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`
+            `${m.role === 'user' ? 'User' : 'Model'}: ${m.content}`
         ).join('\n\n');
 
         const fullPrompt = systemMessage ? `${systemMessage}\n\n${prompt}` : prompt;
@@ -266,11 +239,11 @@ export class LLMClient {
     }
 
     /**
-     * Stream chat responses (for real-time display)
+     * Stream a chat response (simplified for now, falls back to non-streaming for CLI)
      */
-    async *streamChat(messages: ChatMessage[]): AsyncGenerator<string> {
-        // CLI-based providers don't support streaming, return full response
+    async *streamChat(messages: ChatMessage[]): AsyncGenerator<string, void, unknown> {
         if (this.config.useCLI) {
+            // CLI tools don't support streaming easily, so we await full response
             const response = await this.chatCLI(messages);
             yield response.content;
             return;
@@ -284,15 +257,15 @@ export class LLMClient {
                 yield* this.streamAnthropic(messages);
                 break;
             case 'google':
-                // Google doesn't have a straightforward streaming API in this SDK
+                // Fallback to non-streaming for Google (simplification)
                 const response = await this.chatGoogle(messages);
                 yield response.content;
                 break;
         }
     }
 
-    private async *streamOpenAI(messages: ChatMessage[]): AsyncGenerator<string> {
-        if (!this.openaiClient) throw new Error('OpenAI client not initialized');
+    private async *streamOpenAI(messages: ChatMessage[]): AsyncGenerator<string, void, unknown> {
+        if (!this.openaiClient) return;
 
         const stream = await this.openaiClient.chat.completions.create({
             model: this.config.model,
@@ -306,18 +279,18 @@ export class LLMClient {
         });
 
         for await (const chunk of stream) {
-            const content = chunk.choices[0]?.delta?.content;
+            const content = chunk.choices[0]?.delta?.content || '';
             if (content) yield content;
         }
     }
 
-    private async *streamAnthropic(messages: ChatMessage[]): AsyncGenerator<string> {
-        if (!this.anthropicClient) throw new Error('Anthropic client not initialized');
+    private async *streamAnthropic(messages: ChatMessage[]): AsyncGenerator<string, void, unknown> {
+        if (!this.anthropicClient) return;
 
         const systemMessage = messages.find(m => m.role === 'system')?.content;
         const chatMessages = messages.filter(m => m.role !== 'system');
 
-        const stream = await this.anthropicClient.messages.stream({
+        const stream = await this.anthropicClient.messages.create({
             model: this.config.model,
             max_tokens: this.config.maxTokens || 4096,
             system: systemMessage,
@@ -325,6 +298,8 @@ export class LLMClient {
                 role: m.role as 'user' | 'assistant',
                 content: m.content,
             })),
+            temperature: this.config.temperature,
+            stream: true,
         });
 
         for await (const event of stream) {
