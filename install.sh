@@ -5,7 +5,7 @@
 set -e
 
 # Configuration
-GITHUB_REPO="shelter/DiffLearn" # Default based on local user, change if different!
+GITHUB_REPO="lertsoft/DiffLearn" # Default based on local user, change if different!
 BINARY_NAME="difflearn"
 INSTALL_DIR="/usr/local/bin"
 

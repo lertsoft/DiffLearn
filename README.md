@@ -10,11 +10,13 @@ DiffLearn helps developers understand code changes through an interactive termin
 
 - **🎨 Interactive Diff Viewer** - Red/green syntax highlighting with keyboard navigation
 - **💬 Click-to-Ask** - Select any change and ask questions about it
-- **🌐 Web UI** - Beautiful local web interface for viewing all commits and diffs
+- **🚀 Unified Dashboard** - View local, staged, and history on one screen in the terminal
+- **🔀 Commit Comparison** - Select any two commits in Web or CLI to see and analyze the diff between them
+- **🌐 Remote Web UI** - Beautiful local web interface with comparison support and AI chat
 - **🆓 Use Your Subscriptions** - Works with Gemini CLI, Claude Code, Cursor (no API fees!)
-- **🤖 API Support** - Also supports OpenAI, Anthropic, and Google APIs
-- **🔌 MCP Server** - Works with Cursor, Claude Code, Gemini CLI, OpenCode
-- **📊 Multiple Modes** - Local changes, commits, branches, staged files
+- **🤖 API Support** - Native support for OpenAI, Anthropic, and Google AI APIs
+- **🔌 MCP Server** - Full integration with Cursor, Claude Code, and other MCP clients
+- **⌨️ Keyboard First** - Full scrolling and windowing support for large diffs and histories
 
 
 ## Installation
@@ -22,7 +24,7 @@ DiffLearn helps developers understand code changes through an interactive termin
 ### One-Line Install (Recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/shelter/DiffLearn/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/lertsoft/DiffLearn/master/install.sh | bash
 ```
 
 ### Manual Installation
@@ -63,6 +65,10 @@ difflearn branch main feature/new-auth
 difflearn explain
 difflearn review
 difflearn summary
+
+# Interactive Compare
+difflearn local       # Use Tab to switch to History, then Enter to select
+difflearn web         # Click '+' buttons next to commits to compare two SHAs
 ```
 
 ## Web UI Accessibility & Controls
@@ -71,24 +77,26 @@ The Web Interface (`difflearn web`) is fully accessible and keyboard-friendly:
 
 | Key | Action |
 |-----|--------|
-| `s`/`j`/`↓` | Select next commit |
-| `w`/`k`/`↑` | Select previous commit |
-| `Enter` | Select currently focused commit |
+| `s`/`j`/`↓` | Select next commit in list |
+| `w`/`k`/`↑` | Select previous commit in list |
+| `Enter` | Select currently focused commit / Confirm comparison |
 | `a`/`←` | Switch to previous view (e.g. History → Staged) |
 | `d`/`→` | Switch to next view (e.g. Local → Staged) |
 | `/` | Focus Chat Input |
-| `Esc` | Close panels / Clear focus |
+| `Esc` | Close panels / Exit comparison mode |
+| `+` (Web) | Click the '+' button next to commits to select for comparison (max 2) |
 
 ## CLI Interactive Controls
 
 | Key | Action |
 |-----|--------|
-| `↑`/`k`/`w` | Move to previous hunk |
-| `↓`/`j`/`s` | Move to next hunk |
-| `?` | Open chat for selected hunk |
-| `Enter` | Expand/collapse hunk |
-| `ESC` | Close chat panel |
-| `q` | Quit |
+| `Tab` | Switch between Local Changes, Staged Changes, and History |
+| `↑`/`↓` | Navigate history list or scroll long AI responses |
+| `Enter` | View diff for selected commit or file |
+| `/` / `i` | Focus AI Chat input |
+| `Esc` | Exit chat/scrolling mode back to dashboard |
+| `q` | Quit or go back from current view |
+| `c` (Chat) | Clear current chat history |
 
 ## LLM Configuration
 
@@ -193,13 +201,13 @@ difflearn serve --api --port 3000
 
 # Endpoints
 GET  /diff/local                    # Local changes
-GET  /diff/commit/:sha              # Commit diff
+GET  /diff/commit/:sha              # Single commit or comparison (using ?compare=sha2)
 GET  /diff/branch/:b1/:b2          # Branch diff
-GET  /history                       # Commit history
-POST /explain                       # AI explanation
-POST /review                        # AI code review
-POST /ask                           # Ask about diff
-POST /summary                       # Quick summary
+GET  /history                       # Commit history with windowing support
+POST /explain                       # AI explanation (supports commit/staged/compare)
+POST /review                        # AI code review (supports commit/staged/compare)
+POST /ask                           # Ask questions (supports commit/staged/compare)
+POST /summary                       # Quick summary (supports commit/staged/compare)
 ```
 
 ## CLI Commands
