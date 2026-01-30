@@ -193,11 +193,11 @@ const DiffLine: React.FC<DiffLineProps> = ({ line }) => {
         }
     };
 
-    const getColor = () => {
+    const getColor = (): 'greenBright' | 'redBright' | 'gray' => {
         switch (line.type) {
-            case 'add': return 'green' as const;
-            case 'delete': return 'red' as const;
-            case 'context': return 'gray' as const;
+            case 'add': return 'greenBright';
+            case 'delete': return 'redBright';
+            case 'context': return 'gray';
         }
     };
 
@@ -208,7 +208,7 @@ const DiffLine: React.FC<DiffLineProps> = ({ line }) => {
     return (
         <Box>
             <Text color="gray" dimColor>{lineNum} </Text>
-            <Text color={getColor()} backgroundColor={line.type === 'add' ? 'greenBright' : line.type === 'delete' ? 'redBright' : undefined} dimColor={line.type !== 'context' ? false : true}>
+            <Text color={getColor()} dimColor={line.type === 'context'}>
                 {getLinePrefix()}{line.content}
             </Text>
         </Box>

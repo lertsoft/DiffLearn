@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text, useInput, useFocus } from 'ink';
 import TextInput from 'ink-text-input';
 import { ParsedDiff } from '../../git';
-import { LLMClient, ChatMessage, SYSTEM_PROMPT, createLineQuestionPrompt } from '../../llm';
+import { LLMClient, ChatMessage, SYSTEM_PROMPT, createLineQuestionPrompt, createReviewPrompt, createSummaryPrompt, createExplainPrompt } from '../../llm';
 
 interface ChatPanelProps {
     diff: ParsedDiff;
@@ -73,11 +73,23 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         }
 
         try {
+            // Determine prompt based on input
+            let prompt = '';
+            if (query === '/explain') {
+                prompt = createExplainPrompt([diff]); // Analyze the whole file diff
+            } else if (query === '/review') {
+                prompt = createReviewPrompt([diff]);
+            } else if (query === '/summarize') {
+                prompt = createSummaryPrompt([diff]);
+            } else {
+                prompt = createLineQuestionPrompt(diff, hunkIndex, query);
+            }
+
             // Build conversation history for LLM
             const chatHistory: ChatMessage[] = [
                 { role: 'system', content: SYSTEM_PROMPT },
                 ...messages.map(m => ({ role: m.role, content: m.content })),
-                { role: 'user', content: createLineQuestionPrompt(diff, hunkIndex, query) }
+                { role: 'user', content: prompt }
             ];
 
             // Stream the response
@@ -177,9 +189,19 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     value={input}
                     onChange={setInput}
                     onSubmit={handleSubmit}
-                    placeholder="Type your question and press Enter..."
+                    placeholder="Type a question or use /explain, /review, /summarize..."
                 />
             </Box>
+            {input.startsWith('/') && (
+                <Box marginLeft={2} marginBottom={0}>
+                    <Text color="gray" dimColor>
+                        Suggestions:
+                        <Text color={input === '/explain' ? 'cyan' : 'gray'}> /explain</Text>
+                        <Text color={input === '/review' ? 'cyan' : 'gray'}> /review</Text>
+                        <Text color={input === '/summarize' ? 'cyan' : 'gray'}> /summarize</Text>
+                    </Text>
+                </Box>
+            )}
         </Box>
     );
 };

@@ -1,5 +1,6 @@
 {
   "name": "difflearn",
+  "author": "lertsoft",
   "version": "0.1.0",
   "description": "Interactive git diff learning tool with LLM-powered explanations",
   "type": "module",

@@ -4,9 +4,17 @@
 import { describe, test, expect } from 'bun:test';
 
 describe('CLI', () => {
-    const runCLI = async (args: string[]) => {
+    const runCLI = async (args: string[], envOverrides: Record<string, string> = {}) => {
         const proc = Bun.spawn(['bun', 'run', 'src/cli/index.tsx', ...args], {
             cwd: process.cwd(),
+            env: {
+                ...process.env,
+                DIFFLEARN_LLM_PROVIDER: 'openai',
+                OPENAI_API_KEY: '',
+                ANTHROPIC_API_KEY: '',
+                GOOGLE_AI_API_KEY: '',
+                ...envOverrides
+            },
             stdout: 'pipe',
             stderr: 'pipe',
         });

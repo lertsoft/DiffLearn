@@ -3,6 +3,7 @@ import React from 'react';
 import { render } from 'ink';
 import { Command } from 'commander';
 import { App, DiffMode, ConfigWizard } from './components';
+import UnifiedDashboard from './components/UnifiedDashboard';
 import { GitExtractor, DiffFormatter } from '../git';
 import { loadConfig, isLLMAvailable } from '../config';
 import { LLMClient, SYSTEM_PROMPT, createExplainPrompt, createReviewPrompt, createSummaryPrompt } from '../llm';
@@ -13,7 +14,10 @@ const program = new Command();
 program
     .name('difflearn')
     .description('Interactive git diff learning tool with LLM-powered explanations')
-    .version('0.1.0');
+    .version('0.1.0')
+    .action(() => {
+        render(<UnifiedDashboard />);
+    });
 
 // Interactive local diff viewer
 program
