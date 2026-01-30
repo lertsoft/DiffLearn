@@ -10,7 +10,14 @@ describe('API Server', () => {
     beforeAll(async () => {
         // Start the API server on a test port
         serverProcess = Bun.spawn(['bun', 'run', 'src/api/server.ts'], {
-            env: { ...process.env, PORT: '3333' },
+            env: {
+                ...process.env,
+                PORT: '3333',
+                DIFFLEARN_LLM_PROVIDER: 'openai',
+                OPENAI_API_KEY: '',
+                ANTHROPIC_API_KEY: '',
+                GOOGLE_AI_API_KEY: '',
+            },
             stdout: 'pipe',
             stderr: 'pipe',
         });

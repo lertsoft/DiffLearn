@@ -37,6 +37,19 @@ function findWebDir(): string {
 
 const webDir = findWebDir();
 
+// Helper function to get commit diff, handling comparison format (sha1..sha2)
+async function getCommitDiffWithCompare(commit: string) {
+    // Check if this is a comparison format (sha1..sha2)
+    if (commit.includes('..')) {
+        const [sha1, sha2] = commit.split('..');
+        if (sha1 && sha2) {
+            return await git.getCommitDiff(sha1, sha2);
+        }
+    }
+    // Single commit
+    return await git.getCommitDiff(commit);
+}
+
 export async function startAPIServer(port: number = 3000) {
     const app = new Hono();
 
@@ -193,7 +206,7 @@ export async function startAPIServer(port: number = 3000) {
 
         try {
             const config = loadConfig();
-            const diffs = commit ? await git.getCommitDiff(commit) : await git.getLocalDiff({ staged });
+            const diffs = commit ? await getCommitDiffWithCompare(commit) : await git.getLocalDiff({ staged });
 
             if (diffs.length === 0) {
                 return c.json({ success: true, data: { explanation: 'No changes to explain.' } });
@@ -237,7 +250,7 @@ export async function startAPIServer(port: number = 3000) {
 
         try {
             const config = loadConfig();
-            const diffs = commit ? await git.getCommitDiff(commit) : await git.getLocalDiff({ staged });
+            const diffs = commit ? await getCommitDiffWithCompare(commit) : await git.getLocalDiff({ staged });
 
             if (diffs.length === 0) {
                 return c.json({ success: true, data: { review: 'No changes to review.' } });
@@ -284,7 +297,7 @@ export async function startAPIServer(port: number = 3000) {
 
         try {
             const config = loadConfig();
-            const diffs = commit ? await git.getCommitDiff(commit) : await git.getLocalDiff({ staged });
+            const diffs = commit ? await getCommitDiffWithCompare(commit) : await git.getLocalDiff({ staged });
 
             if (diffs.length === 0) {
                 return c.json({ success: true, data: { answer: 'No changes to ask about.' } });
@@ -328,7 +341,7 @@ export async function startAPIServer(port: number = 3000) {
 
         try {
             const config = loadConfig();
-            const diffs = commit ? await git.getCommitDiff(commit) : await git.getLocalDiff({ staged });
+            const diffs = commit ? await getCommitDiffWithCompare(commit) : await git.getLocalDiff({ staged });
 
             if (diffs.length === 0) {
                 return c.json({ success: true, data: { summary: 'No changes to summarize.' } });
