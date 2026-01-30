@@ -4,7 +4,7 @@ import { EventEmitter } from "events";
 import { LLMClient } from "../src/llm/client";
 import { Config } from "../src/config";
 
-// Mock Child Process
+// Mock Child Process Spawner
 const mockSpawn = mock((command, args, options) => {
     const proc: any = new EventEmitter();
     proc.stdout = new EventEmitter();
@@ -16,16 +16,12 @@ const mockSpawn = mock((command, args, options) => {
 
     // Simulate async output
     setTimeout(() => {
-        proc.stdout.emit('data', 'Mock LLM Response');
+        proc.stdout.emit('data', Buffer.from('Mock LLM Response'));
         proc.emit('close', 0);
     }, 10);
 
     return proc;
 });
-
-mock.module("child_process", () => ({
-    spawn: mockSpawn
-}));
 
 describe("LLMClient", () => {
     test("chatCLI with gemini-cli uses stdin", async () => {
@@ -34,6 +30,7 @@ describe("LLMClient", () => {
             useCLI: true,
             apiKey: 'test',
             model: 'test',
+            spawner: mockSpawn, // Inject mock
         };
 
         const client = new LLMClient(config);
@@ -62,6 +59,7 @@ describe("LLMClient", () => {
             useCLI: true,
             apiKey: 'test',
             model: 'test',
+            spawner: mockSpawn,
         };
 
         const client = new LLMClient(config);
@@ -73,18 +71,12 @@ describe("LLMClient", () => {
         const call = mockSpawn.mock.calls[0];
         expect(call[0]).toBe('claude');
         expect(call[1]).toContain('-p');
-        // Prompt is in args, not stdin (based on current implementation)
-        // Wait, execClaudeCLI passes prompt as arg?
-        // private async execClaudeCLI(prompt: string): Promise<string> {
-        //    return this.execCLIWithStdin('claude', ['-p', prompt], '');
-        // }
-        // So prompt is in args. input is empty string.
         expect(call[1].join(' ')).toContain('User: Hi Claude');
     });
 
     test("handles CLI errors", async () => {
         // Setup mock to fail
-        mockSpawn.mockImplementationOnce(() => {
+        const errorMockSpawn = mock(() => {
             const proc: any = new EventEmitter();
             proc.stdout = new EventEmitter();
             proc.stderr = new EventEmitter();
@@ -96,7 +88,13 @@ describe("LLMClient", () => {
             return proc;
         });
 
-        const config: Config = { provider: 'gemini-cli', useCLI: true, apiKey: '', model: '' };
+        const config: Config = {
+            provider: 'gemini-cli',
+            useCLI: true,
+            apiKey: '',
+            model: '',
+            spawner: errorMockSpawn
+        };
         const client = new LLMClient(config);
 
         try {
@@ -108,7 +106,13 @@ describe("LLMClient", () => {
     });
 
     test("chatCLI with codex uses stdin", async () => {
-        const config: Config = { provider: 'codex', useCLI: true, apiKey: '', model: '' };
+        const config: Config = {
+            provider: 'codex',
+            useCLI: true,
+            apiKey: '',
+            model: '',
+            spawner: mockSpawn
+        };
         const client = new LLMClient(config);
         mockSpawn.mockClear();
 

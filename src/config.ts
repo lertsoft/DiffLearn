@@ -14,6 +14,7 @@ export interface Config {
     temperature?: number;
     maxTokens?: number;
     useCLI: boolean;  // Whether using CLI-based provider
+    spawner?: (command: string, args: string[], options: any) => any; // For testing
 }
 
 interface ProviderDefaults {
@@ -47,22 +48,22 @@ export async function isCLIAvailable(command: string): Promise<boolean> {
     }
 }
 
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+
 /**
  * Load configuration from ~/.difflearn file
  */
 function loadConfigFromFile(): Record<string, string> {
-    const { existsSync, readFileSync } = require('fs');
-    const { join } = require('path');
-    const { homedir } = require('os');
+    const configFile = path.join(os.homedir(), '.difflearn');
 
-    const configFile = join(homedir(), '.difflearn');
-
-    if (!existsSync(configFile)) {
+    if (!fs.existsSync(configFile)) {
         return {};
     }
 
     try {
-        const content = readFileSync(configFile, 'utf-8');
+        const content = fs.readFileSync(configFile, 'utf-8');
         const config: Record<string, string> = {};
 
         for (const line of content.split('\n')) {

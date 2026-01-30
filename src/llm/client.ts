@@ -135,17 +135,18 @@ export class LLMClient {
      */
     private async execCLIWithStdin(command: string, args: string[], input: string): Promise<string> {
         return new Promise((resolve, reject) => {
-            const proc = spawn(command, args, {
+            const spawnFn = this.config.spawner || spawn;
+            const proc = spawnFn(command, args, {
                 stdio: ['pipe', 'pipe', 'pipe'],
             });
 
             let stdout = '';
             let stderr = '';
 
-            proc.stdout.on('data', (data) => { stdout += data.toString(); });
-            proc.stderr.on('data', (data) => { stderr += data.toString(); });
+            proc.stdout.on('data', (data: Buffer | string) => { stdout += data.toString(); });
+            proc.stderr.on('data', (data: Buffer | string) => { stderr += data.toString(); });
 
-            proc.on('close', (code) => {
+            proc.on('close', (code: number | null) => {
                 if (code === 0) {
                     resolve(stdout.trim());
                 } else {
@@ -153,7 +154,7 @@ export class LLMClient {
                 }
             });
 
-            proc.on('error', (err) => {
+            proc.on('error', (err: Error) => {
                 reject(new Error(`Failed to run ${command}: ${err.message}`));
             });
 

@@ -1,11 +1,22 @@
 /**
  * Tests for the Config module
  */
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test';
 import { loadConfig, isLLMAvailable, detectProvider, isCLIAvailable, getCLICommand } from '../src/config';
 
 describe('Config', () => {
     const originalEnv = { ...process.env };
+
+    // Mock fs for loadConfigFromFile
+    mock.module('fs', () => ({
+        existsSync: () => false, // Default: config file doesn't exist
+        readFileSync: () => '',
+    }));
+
+    // Also mock os.homedir to be safe
+    mock.module('os', () => ({
+        homedir: () => '/mock/home',
+    }));
 
     beforeEach(() => {
         // Clear all LLM-related env vars before each test
