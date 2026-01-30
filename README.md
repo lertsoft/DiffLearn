@@ -19,6 +19,14 @@ DiffLearn helps developers understand code changes through an interactive termin
 
 ## Installation
 
+### One-Line Install (Recommended)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/shelter/DiffLearn/master/install.sh | bash
+```
+
+### Manual Installation
+
 ```bash
 # Clone and install
 git clone https://github.com/yourusername/DiffLearn.git
