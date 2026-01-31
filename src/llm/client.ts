@@ -42,6 +42,14 @@ export class LLMClient {
             case 'google':
                 this.googleClient = new GoogleGenerativeAI(this.config.apiKey);
                 break;
+            case 'ollama':
+            case 'lmstudio':
+                // Ollama and LM Studio use OpenAI-compatible API
+                this.openaiClient = new OpenAI({
+                    apiKey: 'not-needed',  // Local providers don't require API key
+                    baseURL: this.config.baseUrl,
+                });
+                break;
         }
     }
 
@@ -56,6 +64,8 @@ export class LLMClient {
 
         switch (this.config.provider) {
             case 'openai':
+            case 'ollama':
+            case 'lmstudio':
                 return this.chatOpenAI(messages);
             case 'anthropic':
                 return this.chatAnthropic(messages);
@@ -252,6 +262,8 @@ export class LLMClient {
 
         switch (this.config.provider) {
             case 'openai':
+            case 'ollama':
+            case 'lmstudio':
                 yield* this.streamOpenAI(messages);
                 break;
             case 'anthropic':

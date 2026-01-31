@@ -27,6 +27,7 @@ describe('Config', () => {
         delete process.env.DIFFLEARN_MODEL;
         delete process.env.DIFFLEARN_TEMPERATURE;
         delete process.env.DIFFLEARN_MAX_TOKENS;
+        delete process.env.DIFFLEARN_BASE_URL;
     });
 
     afterEach(() => {
@@ -67,7 +68,42 @@ describe('Config', () => {
 
             expect(config.provider).toBe('gemini-cli');
             expect(config.useCLI).toBe(true);
-            expect(config.apiKey).toBe('cli');
+            expect(config.apiKey).toBe('local');
+        });
+
+        test('should use Ollama provider with default base URL', () => {
+            process.env.DIFFLEARN_LLM_PROVIDER = 'ollama';
+            const config = loadConfig();
+
+            expect(config.provider).toBe('ollama');
+            expect(config.useCLI).toBe(false);
+            expect(config.baseUrl).toBe('http://localhost:11434/v1');
+            expect(config.model).toBe('llama3.2');
+        });
+
+        test('should use LM Studio provider with default base URL', () => {
+            process.env.DIFFLEARN_LLM_PROVIDER = 'lmstudio';
+            const config = loadConfig();
+
+            expect(config.provider).toBe('lmstudio');
+            expect(config.useCLI).toBe(false);
+            expect(config.baseUrl).toBe('http://localhost:1234/v1');
+        });
+
+        test('should use custom base URL for local providers', () => {
+            process.env.DIFFLEARN_LLM_PROVIDER = 'ollama';
+            process.env.DIFFLEARN_BASE_URL = 'http://localhost:8080/v1';
+            const config = loadConfig();
+
+            expect(config.baseUrl).toBe('http://localhost:8080/v1');
+        });
+
+        test('should use custom model for Ollama', () => {
+            process.env.DIFFLEARN_LLM_PROVIDER = 'ollama';
+            process.env.DIFFLEARN_MODEL = 'codellama';
+            const config = loadConfig();
+
+            expect(config.model).toBe('codellama');
         });
 
         test('should use custom model when specified', () => {
@@ -125,6 +161,20 @@ describe('Config', () => {
             };
 
             expect(isLLMAvailable(config)).toBe(false);
+        });
+
+        test('should return true for Ollama provider', () => {
+            process.env.DIFFLEARN_LLM_PROVIDER = 'ollama';
+            const config = loadConfig();
+
+            expect(isLLMAvailable(config)).toBe(true);
+        });
+
+        test('should return true for LM Studio provider', () => {
+            process.env.DIFFLEARN_LLM_PROVIDER = 'lmstudio';
+            const config = loadConfig();
+
+            expect(isLLMAvailable(config)).toBe(true);
         });
     });
 

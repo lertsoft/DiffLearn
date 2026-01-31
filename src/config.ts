@@ -2,6 +2,8 @@ export type LLMProvider =
     | 'openai'
     | 'anthropic'
     | 'google'
+    | 'ollama'
+    | 'lmstudio'
     | 'gemini-cli'
     | 'claude-code'
     | 'codex'
@@ -11,6 +13,7 @@ export interface Config {
     provider: LLMProvider;
     model: string;
     apiKey: string;
+    baseUrl?: string;  // Custom API base URL (for Ollama/LM Studio)
     temperature?: number;
     maxTokens?: number;
     useCLI: boolean;  // Whether using CLI-based provider
@@ -22,12 +25,17 @@ interface ProviderDefaults {
     envKey: string;
     cli?: boolean;
     command?: string;
+    baseUrl?: string;  // Default API base URL
+    noApiKey?: boolean;  // Provider doesn't require API key
 }
 
 const PROVIDER_DEFAULTS: Record<LLMProvider, ProviderDefaults> = {
     openai: { model: 'gpt-4o', envKey: 'OPENAI_API_KEY' },
     anthropic: { model: 'claude-sonnet-4-20250514', envKey: 'ANTHROPIC_API_KEY' },
     google: { model: 'gemini-2.0-flash', envKey: 'GOOGLE_AI_API_KEY' },
+    // Local LLM providers (OpenAI-compatible APIs)
+    ollama: { model: 'llama3.2', envKey: '', baseUrl: 'http://localhost:11434/v1', noApiKey: true },
+    lmstudio: { model: 'local-model', envKey: '', baseUrl: 'http://localhost:1234/v1', noApiKey: true },
     // CLI-based providers (use existing subscriptions)
     'gemini-cli': { model: 'gemini', envKey: '', cli: true, command: 'gemini' },
     'claude-code': { model: 'claude', envKey: '', cli: true, command: 'claude' },
@@ -101,25 +109,30 @@ export function loadConfig(): Config {
     if (!PROVIDER_DEFAULTS[provider]) {
         throw new Error(
             `Unknown LLM provider: ${provider}. ` +
-            `Use 'openai', 'anthropic', 'google', 'gemini-cli', 'claude-code', 'codex', or 'cursor-cli'.`
+            `Use 'openai', 'anthropic', 'google', 'ollama', 'lmstudio', 'gemini-cli', 'claude-code', 'codex', or 'cursor-cli'.`
         );
     }
 
     const defaults = PROVIDER_DEFAULTS[provider];
     const useCLI = defaults.cli || false;
 
-    // For CLI providers, no API key needed
-    const apiKey = useCLI ? 'cli' : (process.env[defaults.envKey] || '');
+    // For CLI providers and local providers, no API key needed
+    const needsApiKey = !useCLI && !defaults.noApiKey;
+    const apiKey = needsApiKey ? (process.env[defaults.envKey] || '') : 'local';
 
-    if (!useCLI && !apiKey) {
+    // Get base URL (custom or default)
+    const baseUrl = process.env.DIFFLEARN_BASE_URL || defaults.baseUrl;
+
+    if (needsApiKey && !apiKey) {
         console.warn(`Warning: ${defaults.envKey} not set. LLM features will be unavailable.`);
-        console.warn(`Tip: Use 'gemini-cli', 'claude-code', 'codex', or 'cursor-cli' to use your existing subscriptions.`);
+        console.warn(`Tip: Use 'ollama', 'lmstudio', 'gemini-cli', 'claude-code', 'codex', or 'cursor-cli' for local/subscription based options.`);
     }
 
     return {
         provider,
         model: process.env.DIFFLEARN_MODEL || defaults.model,
         apiKey,
+        baseUrl,
         temperature: parseFloat(process.env.DIFFLEARN_TEMPERATURE || '0.3'),
         maxTokens: parseInt(process.env.DIFFLEARN_MAX_TOKENS || '4096', 10),
         useCLI,
@@ -130,7 +143,11 @@ export function loadConfig(): Config {
  * Check if LLM is configured and available
  */
 export function isLLMAvailable(config: Config): boolean {
-    return config.useCLI || !!config.apiKey;
+    // CLI, Ollama, and LM Studio don't need API keys
+    if (config.useCLI || config.provider === 'ollama' || config.provider === 'lmstudio') {
+        return true;
+    }
+    return !!config.apiKey;
 }
 
 /**
