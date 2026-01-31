@@ -112,6 +112,18 @@ The Web Interface (`difflearn web`) is fully accessible and keyboard-friendly:
 | `q` | Quit or go back from current view |
 | `c` (Chat) | Clear current chat history |
 
+### Slash Commands (type `/` in chat)
+
+| Command | Description |
+|---------|-------------|
+| `/explain` | Get AI explanation of current changes |
+| `/review` | Get AI code review with suggestions |
+| `/summarize` | Get a quick summary of changes |
+| `/update` | Check for updates |
+| `/export` | Export diff as markdown |
+| `/web` | Open web UI in browser |
+| `/config` | Show LLM configuration status |
+
 ## LLM Configuration
 
 ### Quick Setup (Recommended)
@@ -127,7 +139,7 @@ This will:
 - Guide you through authentication
 - Save configuration securely to `~/.difflearn`
 
-### CLI-Based Providers (Free with Your Subscription!)
+### CLI-Based Providers (Use your current Subscription!)
 
 Use your existing AI subscriptions without extra API costs:
 
@@ -144,6 +156,36 @@ difflearn config --status
 
 # Example: Use Gemini CLI
 export DIFFLEARN_LLM_PROVIDER=gemini-cli
+```
+
+### Local LLM Providers (Free & Private!)
+
+Run AI locally on your machine with no API costs and full privacy:
+
+| Provider | Default URL | Setup |
+|----------|-------------|-------|
+| **Ollama** | `localhost:11434` | [Install Ollama](https://ollama.com) + `ollama pull llama3.2` |
+| **LM Studio** | `localhost:1234` | [Install LM Studio](https://lmstudio.ai) + start local server |
+
+The easiest way to configure is with the wizard, which detects your downloaded models:
+
+```bash
+difflearn config
+# Select Ollama or LM Studio, then choose from your available models
+```
+
+Or set environment variables directly:
+
+```bash
+# Use Ollama
+export DIFFLEARN_LLM_PROVIDER=ollama
+export DIFFLEARN_MODEL=llama3.2
+
+# Use LM Studio
+export DIFFLEARN_LLM_PROVIDER=lmstudio
+
+# Custom base URL (if not using default port)
+export DIFFLEARN_BASE_URL=http://localhost:8080/v1
 ```
 
 ### API-Based Providers

@@ -5,6 +5,7 @@ import { GitExtractor, ParsedDiff, CommitInfo, DiffFormatter } from '../../git';
 import { LLMClient } from '../../llm';
 import { loadConfig, isLLMAvailable } from '../../config';
 import { createExplainPrompt, createReviewPrompt, createSummaryPrompt, createQuestionPrompt, SYSTEM_PROMPT } from '../../llm/prompts';
+import { checkForUpdates, formatUpdateMessage, UpdateInfo } from '../../update';
 import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -52,6 +53,7 @@ const SLASH_COMMANDS: SlashCommand[] = [
     { cmd: '/staged', desc: 'View staged changes', globalOnly: true },
     { cmd: '/web', desc: 'Open web UI in browser', globalOnly: true },
     { cmd: '/config', desc: 'Show LLM configuration status', globalOnly: true },
+    { cmd: '/update', desc: 'Check for updates', globalOnly: true },
 
     // Commands that work on commits
     { cmd: '/compare', desc: 'Compare with another commit', requiresCommit: true },
@@ -82,6 +84,9 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
     const [compareIndex, setCompareIndex] = useState(0);
     const [compareWith, setCompareWith] = useState<CommitInfo | null>(null); // The second commit in comparison
 
+    // Update state
+    const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+
     // Load all data at once
     useEffect(() => {
         const init = async () => {
@@ -105,6 +110,13 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
                 ]);
 
                 setData({ localDiffs, stagedDiffs, commits });
+
+                // Check for updates in background (non-blocking)
+                checkForUpdates().then(info => {
+                    if (info) setUpdateInfo(info);
+                }).catch(() => {
+                    // Silently ignore update check failures
+                });
             } catch (err) {
                 setError(err instanceof Error ? err.message : 'An error occurred');
             } finally {
@@ -467,9 +479,30 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
                 return;
             }
 
+            if (query === '/update') {
+                setChatInput('');
+                const msg: ChatMessage = { role: 'assistant', content: '🔍 Checking for updates...' };
+                setChatHistory(prev => [...prev, msg]);
+
+                checkForUpdates().then(info => {
+                    if (info) {
+                        setUpdateInfo(info);
+                        const updateMsg: ChatMessage = { role: 'assistant', content: formatUpdateMessage(info) };
+                        setChatHistory(prev => [...prev, updateMsg]);
+                    } else {
+                        const errorMsg: ChatMessage = { role: 'assistant', content: '⚠️ Could not check for updates. Are you connected to the internet?' };
+                        setChatHistory(prev => [...prev, errorMsg]);
+                    }
+                }).catch(err => {
+                    const errorMsg: ChatMessage = { role: 'assistant', content: `❌ Update check failed: ${err.message}` };
+                    setChatHistory(prev => [...prev, errorMsg]);
+                });
+                return;
+            }
+
             // If we get here with a slash command, it wasn't handled above
             // This means it's either a partial match with multiple options, or invalid
-            const isValidCommand = ['/explain', '/review', '/summarize', '/local', '/staged', '/history', '/web', '/config', '/export', '/compare'].includes(query);
+            const isValidCommand = ['/explain', '/review', '/summarize', '/local', '/staged', '/history', '/web', '/config', '/export', '/compare', '/update'].includes(query);
             if (!isValidCommand) {
                 const contextMatches = getMatchingCommands();
                 if (contextMatches.length > 1) {
@@ -776,6 +809,12 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
                 <Text color={llmClient ? 'greenBright' : 'yellow'}>
                     {llmClient ? '🤖 AI' : '⚠ No AI'}
                 </Text>
+                {updateInfo?.updateAvailable && (
+                    <>
+                        <Text color="gray"> • </Text>
+                        <Text color="yellow">🆕 v{updateInfo.latestVersion} available</Text>
+                    </>
+                )}
                 <Text color="gray"> • </Text>
                 <Text color="gray">
                     {selectedCommit
