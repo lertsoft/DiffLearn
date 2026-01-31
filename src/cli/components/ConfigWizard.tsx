@@ -9,20 +9,37 @@ import { homedir } from 'os';
 interface ProviderInfo {
     id: LLMProvider;
     name: string;
-    type: 'cli' | 'api';
+    type: 'cli' | 'api' | 'local';
     description: string;
     authCommand?: string[];
     envKey?: string;
     installed?: boolean;
     configured?: boolean;
+    baseUrl?: string;  // For local providers
 }
 
 const PROVIDERS: ProviderInfo[] = [
+    // Local LLM providers (free & private)
+    {
+        id: 'ollama',
+        name: 'Ollama',
+        type: 'local',
+        description: 'Run AI Models locally',
+        baseUrl: 'http://localhost:11434',
+    },
+    {
+        id: 'lmstudio',
+        name: 'LM Studio',
+        type: 'local',
+        description: 'Run AI Models locally',
+        baseUrl: 'http://localhost:1234',
+    },
+    // CLI-based providers
     {
         id: 'gemini-cli',
         name: 'Gemini CLI',
         type: 'cli',
-        description: 'Use your Google AI subscription (free!)',
+        description: 'Use your Google Gemini subscription',
         authCommand: ['gemini', 'auth', 'login'],
     },
     {
@@ -46,6 +63,7 @@ const PROVIDERS: ProviderInfo[] = [
         description: 'Use your Cursor subscription',
         authCommand: ['cursor', '--login'],
     },
+    // API-based providers
     {
         id: 'openai',
         name: 'OpenAI API',
@@ -69,7 +87,49 @@ const PROVIDERS: ProviderInfo[] = [
     },
 ];
 
-type Screen = 'main' | 'select' | 'api-setup' | 'cli-auth' | 'status' | 'success';
+/**
+ * Fetch available models from Ollama
+ */
+async function fetchOllamaModels(): Promise<string[]> {
+    try {
+        const response = await fetch('http://localhost:11434/api/tags');
+        if (!response.ok) return [];
+        const data = await response.json() as { models?: { name: string }[] };
+        return (data.models || []).map(m => m.name);
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * Fetch available models from LM Studio
+ */
+async function fetchLMStudioModels(): Promise<string[]> {
+    try {
+        const response = await fetch('http://localhost:1234/v1/models');
+        if (!response.ok) return [];
+        const data = await response.json() as { data?: { id: string }[] };
+        return (data.data || []).map(m => m.id);
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * Check if a local provider is running
+ */
+async function isLocalProviderRunning(provider: ProviderInfo): Promise<boolean> {
+    if (provider.id === 'ollama') {
+        const models = await fetchOllamaModels();
+        return models.length > 0;
+    } else if (provider.id === 'lmstudio') {
+        const models = await fetchLMStudioModels();
+        return models.length > 0;
+    }
+    return false;
+}
+
+type Screen = 'main' | 'select' | 'api-setup' | 'cli-auth' | 'model-select' | 'status' | 'success';
 
 export function ConfigWizard() {
     const { exit } = useApp();
@@ -82,8 +142,11 @@ export function ConfigWizard() {
     const [isLoading, setIsLoading] = useState(true);
     const [authRunning, setAuthRunning] = useState(false);
     const [cachedConfig, setCachedConfig] = useState<{ provider: string; useCLI: boolean } | null>(null);
+    const [availableModels, setAvailableModels] = useState<string[]>([]);
+    const [modelIndex, setModelIndex] = useState(0);
+    const [loadingModels, setLoadingModels] = useState(false);
 
-    // Check which CLI tools are installed
+    // Check which CLI tools are installed and local providers running
     useEffect(() => {
         async function checkProviders() {
             const updated = await Promise.all(
@@ -92,6 +155,9 @@ export function ConfigWizard() {
                         const cmd = p.authCommand?.[0] || '';
                         const installed = await isCLIAvailable(cmd);
                         return { ...p, installed };
+                    } else if (p.type === 'local') {
+                        const running = await isLocalProviderRunning(p);
+                        return { ...p, installed: running, configured: running };
                     } else {
                         const configured = !!process.env[p.envKey || ''];
                         return { ...p, installed: true, configured };
@@ -147,7 +213,25 @@ export function ConfigWizard() {
                 const provider = providers[selectedIndex];
                 setCurrentProvider(provider);
 
-                if (provider.type === 'cli') {
+                if (provider.type === 'local') {
+                    // Fetch available models (wrap in IIFE since callback isn't async)
+                    setLoadingModels(true);
+                    void (async () => {
+                        const models = provider.id === 'ollama'
+                            ? await fetchOllamaModels()
+                            : await fetchLMStudioModels();
+                        setLoadingModels(false);
+
+                        if (models.length === 0) {
+                            setMessage(`${provider.name} is not running or has no models. Start it first.`);
+                            setScreen('main');
+                        } else {
+                            setAvailableModels(models);
+                            setModelIndex(0);
+                            setScreen('model-select');
+                        }
+                    })();
+                } else if (provider.type === 'cli') {
                     if (!provider.installed) {
                         setMessage(`${provider.name} is not installed. Please install it first.`);
                         setScreen('main');
@@ -172,6 +256,16 @@ export function ConfigWizard() {
             if (key.return && !authRunning) {
                 setAuthRunning(true);
                 runAuthCommand(currentProvider!);
+            }
+        } else if (screen === 'model-select') {
+            if (key.upArrow || input === 'k') {
+                setModelIndex((i) => Math.max(0, i - 1));
+            } else if (key.downArrow || input === 'j') {
+                setModelIndex((i) => Math.min(availableModels.length - 1, i + 1));
+            } else if (key.return && availableModels.length > 0) {
+                saveLocalProvider(currentProvider!, availableModels[modelIndex]);
+                setMessage(`✅ ${currentProvider?.name} configured with ${availableModels[modelIndex]}!`);
+                setScreen('success');
             }
         } else if (screen === 'success' || screen === 'status') {
             if (key.return || input) {
@@ -208,6 +302,29 @@ export function ConfigWizard() {
             } else {
                 writeFileSync(envFile, `${envLine}\n${providerLine}\n`, { mode: 0o600 });
             }
+        }
+    }
+
+    function saveLocalProvider(provider: ProviderInfo, model: string) {
+        const globalEnvFile = join(homedir(), '.difflearn');
+
+        try {
+            let content = '';
+            if (existsSync(globalEnvFile)) {
+                content = readFileSync(globalEnvFile, 'utf-8');
+            }
+
+            // Update or add the provider and model
+            const lines = content.split('\n').filter(l =>
+                !l.startsWith('DIFFLEARN_LLM_PROVIDER') &&
+                !l.startsWith('DIFFLEARN_MODEL')
+            );
+            lines.push(`DIFFLEARN_LLM_PROVIDER=${provider.id}`);
+            lines.push(`DIFFLEARN_MODEL=${model}`);
+
+            writeFileSync(globalEnvFile, lines.filter(Boolean).join('\n') + '\n', { mode: 0o600 });
+        } catch (error) {
+            // Silently fail
         }
     }
 
@@ -294,6 +411,19 @@ export function ConfigWizard() {
                 </Box>
 
                 <Box flexDirection="column">
+                    <Text bold dimColor>Local LLM (free & private):</Text>
+                    {providers.filter(p => p.type === 'local').map(p => (
+                        <Box key={p.id}>
+                            <Text color={p.installed ? 'green' : 'gray'}>
+                                {p.installed ? '✓' : '○'} {p.name}
+                            </Text>
+                            <Text dimColor> - {p.installed ? 'Running' : 'Not running'}</Text>
+                            {p.id === currentConfig.provider && <Text color="cyan"> (active)</Text>}
+                        </Box>
+                    ))}
+                </Box>
+
+                <Box flexDirection="column" marginTop={1}>
                     <Text bold dimColor>CLI-based (use your subscriptions):</Text>
                     {providers.filter(p => p.type === 'cli').map(p => (
                         <Box key={p.id}>
@@ -335,7 +465,24 @@ export function ConfigWizard() {
                 </Box>
 
                 <Box flexDirection="column" marginBottom={1}>
-                    <Text bold dimColor>CLI-based (free with subscription):</Text>
+                    <Text bold dimColor>Local LLM (free & private):</Text>
+                    {providers.filter(p => p.type === 'local').map((p) => {
+                        const realIndex = providers.indexOf(p);
+                        return (
+                            <Box key={p.id}>
+                                <Text color={selectedIndex === realIndex ? 'cyan' : 'white'}>
+                                    {selectedIndex === realIndex ? '▸ ' : '  '}
+                                    {p.installed ? '✓' : '○'} {p.name}
+                                </Text>
+                                <Text dimColor> - {p.description}</Text>
+                                {!p.installed && <Text color="yellow"> (not running)</Text>}
+                            </Box>
+                        );
+                    })}
+                </Box>
+
+                <Box flexDirection="column" marginBottom={1}>
+                    <Text bold dimColor>CLI-based (Use your subscription):</Text>
                     {providers.filter(p => p.type === 'cli').map((p, i) => {
                         const realIndex = providers.indexOf(p);
                         return (
@@ -396,6 +543,39 @@ export function ConfigWizard() {
         );
     }
 
+    // Model Selection Screen (for Ollama/LM Studio)
+    if (screen === 'model-select' && currentProvider) {
+        if (loadingModels) {
+            return (
+                <Box flexDirection="column" padding={1}>
+                    <Text color="cyan">⏳ Loading models from {currentProvider.name}...</Text>
+                </Box>
+            );
+        }
+
+        return (
+            <Box flexDirection="column" padding={1}>
+                <Box marginBottom={1}>
+                    <Text bold color="cyan">🤖 Select a Model ({currentProvider.name})</Text>
+                </Box>
+
+                <Box flexDirection="column" marginBottom={1}>
+                    {availableModels.map((model, i) => (
+                        <Box key={model}>
+                            <Text color={modelIndex === i ? 'cyan' : 'white'}>
+                                {modelIndex === i ? '▸ ' : '  '}{model}
+                            </Text>
+                        </Box>
+                    ))}
+                </Box>
+
+                <Box marginTop={1}>
+                    <Text dimColor>↑/↓ to navigate, Enter to select, Esc to go back</Text>
+                </Box>
+            </Box>
+        );
+    }
+
     // API Key Setup Screen
     if (screen === 'api-setup' && currentProvider) {
         return (
@@ -429,6 +609,11 @@ export function ConfigWizard() {
 
                 <Text>Provider: <Text bold>{currentProvider?.name}</Text></Text>
                 <Text dimColor>Config saved to ~/.difflearn</Text>
+
+                <Box marginTop={1} flexDirection="column">
+                    <Text color="yellow">⚠️ Restart DiffLearn to apply the new provider.</Text>
+                    <Text dimColor>Run 'difflearn' or 'difflearn web' to use the new configuration.</Text>
+                </Box>
 
                 <Box marginTop={1}>
                     <Text>Press any key to continue</Text>

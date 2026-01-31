@@ -181,7 +181,7 @@ export const App: React.FC<AppProps> = ({
 
             <Text color="gray"> • </Text>
             <Text color={llmClient ? 'green' : 'yellow'}>
-                {llmClient ? '🤖 AI Ready' : '⚠ No AI'}
+                {llmClient ? '🤖 LLM Ready' : '⚠ No LLM Detected'}
             </Text>
             <Text color="gray"> • {selectedCommit ? 'q: back' : 'q: quit'}{mode === 'dashboard' ? ', Tab: switch view' : ''}</Text>
         </Box>

@@ -60,10 +60,10 @@ async function checkLLMStatus() {
 
     if (result.llmAvailable) {
         statusDot.classList.add('ready');
-        statusText.textContent = `AI Ready (${result.llmProvider})`;
+        statusText.textContent = `LLM Ready (${result.llmProvider})`;
     } else if (result.status === 'running') {
         statusDot.classList.remove('ready', 'error');
-        statusText.textContent = 'No LLM configured';
+        statusText.textContent = 'No LLM Configured';
     } else {
         statusDot.classList.add('error');
         statusText.textContent = 'API Error';
