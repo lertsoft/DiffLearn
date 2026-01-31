@@ -1,7 +1,7 @@
 {
   "name": "difflearn",
   "author": "lertsoft",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Interactive git diff learning tool with LLM-powered explanations",
   "type": "module",
   "bin": {
@@ -50,13 +50,12 @@
     "llm",
     "code-review",
     "learning",
-    "cli",
-    "mcp"
+    "cli"
   ],
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/difflearn"
+    "url": "https://github.com/lertsoft/DiffLearn"
   },
   "engines": {
     "bun": ">=1.0.0"
