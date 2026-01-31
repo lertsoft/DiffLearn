@@ -4,6 +4,8 @@
 
 DiffLearn helps developers understand code changes through an interactive terminal UI with AI-powered explanations. Navigate diffs with keyboard controls, click on changes to ask questions, and get instant AI insights.
 
+![Demo](DiffLearn_Demo.gif)
+
 ## Features
 
 - **🎨 Interactive Diff Viewer** - Red/green syntax highlighting with keyboard navigation
