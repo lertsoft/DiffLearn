@@ -2,9 +2,13 @@
  * Tests for the API Server endpoints
  */
 import { describe, test, expect, beforeAll, afterAll } from 'bun:test';
+import { GitExtractor } from '../src/git/extractor';
 
 const API_BASE = 'http://localhost:3333';
 let serverProcess: any;
+let commitHash = '';
+let branch1 = '';
+let branch2 = '';
 
 describe('API Server', () => {
     beforeAll(async () => {
@@ -24,6 +28,14 @@ describe('API Server', () => {
 
         // Wait for server to start
         await new Promise(resolve => setTimeout(resolve, 2000));
+
+        const git = new GitExtractor(process.cwd());
+        const commits = await git.getCommitHistory(2);
+        commitHash = commits[0]?.hash || '';
+
+        const branches = await git.getBranches();
+        branch1 = branches[0]?.name || '';
+        branch2 = branches[1]?.name || branches[0]?.name || '';
     });
 
     afterAll(() => {
@@ -87,6 +99,47 @@ describe('API Server', () => {
 
             expect(response.ok).toBe(true);
 
+            const data = await response.json();
+            expect(data.success).toBe(true);
+        });
+
+        test('should return raw format when requested', async () => {
+            const response = await fetch(`${API_BASE}/diff/local?format=raw`);
+
+            expect(response.ok).toBe(true);
+            const text = await response.text();
+            expect(typeof text).toBe('string');
+        });
+    });
+
+    describe('GET /diff/commit/:sha', () => {
+        test('should return commit diff in JSON format', async () => {
+            if (!commitHash) return;
+            const response = await fetch(`${API_BASE}/diff/commit/${commitHash}`);
+
+            expect(response.ok).toBe(true);
+            const data = await response.json();
+            expect(data.success).toBe(true);
+        });
+
+        test('should return commit diff in markdown format', async () => {
+            if (!commitHash) return;
+            const response = await fetch(`${API_BASE}/diff/commit/${commitHash}?format=markdown`);
+
+            expect(response.ok).toBe(true);
+            const text = await response.text();
+            expect(text).toContain('# Git Diff Summary');
+        });
+    });
+
+    describe('GET /diff/branch/:branch1/:branch2', () => {
+        test('should return branch diff in JSON format', async () => {
+            if (!branch1 || !branch2) return;
+            const encodedBranch1 = encodeURIComponent(branch1);
+            const encodedBranch2 = encodeURIComponent(branch2);
+            const response = await fetch(`${API_BASE}/diff/branch/${encodedBranch1}/${encodedBranch2}`);
+
+            expect(response.ok).toBe(true);
             const data = await response.json();
             expect(data.success).toBe(true);
         });
