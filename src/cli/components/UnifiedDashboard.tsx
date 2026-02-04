@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
 import TextInput from 'ink-text-input';
-import { GitExtractor, ParsedDiff, CommitInfo, DiffFormatter } from '../../git';
+import { GitExtractor, ParsedDiff, CommitInfo, DiffFormatter, BranchInfo } from '../../git';
 import { LLMClient } from '../../llm';
 import { loadConfig, isLLMAvailable } from '../../config';
 import { createExplainPrompt, createReviewPrompt, createSummaryPrompt, createQuestionPrompt, SYSTEM_PROMPT } from '../../llm/prompts';
@@ -15,12 +15,14 @@ interface UnifiedDashboardProps {
 }
 
 type Section = 'local' | 'staged' | 'history';
-type FocusArea = 'dashboard' | 'input' | 'response';
+type FocusArea = 'dashboard' | 'input';
 
 interface SectionData {
     localDiffs: ParsedDiff[];
     stagedDiffs: ParsedDiff[];
     commits: CommitInfo[];
+    branches: BranchInfo[];
+    currentBranch: string;
 }
 
 interface ChatMessage {
@@ -63,7 +65,13 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
     repoPath = process.cwd(),
 }) => {
     const { exit } = useApp();
-    const [data, setData] = useState<SectionData>({ localDiffs: [], stagedDiffs: [], commits: [] });
+    const [data, setData] = useState<SectionData>({
+        localDiffs: [],
+        stagedDiffs: [],
+        commits: [],
+        branches: [],
+        currentBranch: '',
+    });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedSection, setSelectedSection] = useState<Section>('local');
@@ -77,12 +85,17 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
     const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
     const [isAsking, setIsAsking] = useState(false);
     const [focusArea, setFocusArea] = useState<FocusArea>('dashboard'); // Start with dashboard focused
-    const [responseScrollOffset, setResponseScrollOffset] = useState(0);
 
     // Compare mode state
     const [compareMode, setCompareMode] = useState(false);
     const [compareIndex, setCompareIndex] = useState(0);
     const [compareWith, setCompareWith] = useState<CommitInfo | null>(null); // The second commit in comparison
+
+    // Branch compare state
+    const [branchCompareMode, setBranchCompareMode] = useState(false);
+    const [branchCompareIndex, setBranchCompareIndex] = useState(0);
+    const [branchCompareTarget, setBranchCompareTarget] = useState<BranchInfo | null>(null);
+    const [branchDiff, setBranchDiff] = useState<ParsedDiff[]>([]);
 
     // Update state
     const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
@@ -103,13 +116,15 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
                     setLlmClient(new LLMClient(config));
                 }
 
-                const [localDiffs, stagedDiffs, commits] = await Promise.all([
+                const [localDiffs, stagedDiffs, commits, branches, currentBranch] = await Promise.all([
                     git.getLocalDiff(),
                     git.getLocalDiff({ staged: true }),
                     git.getCommitHistory(20),
+                    git.getBranches(),
+                    git.getCurrentBranch(),
                 ]);
 
-                setData({ localDiffs, stagedDiffs, commits });
+                setData({ localDiffs, stagedDiffs, commits, branches, currentBranch });
 
                 // Check for updates in background (non-blocking)
                 checkForUpdates().then(info => {
@@ -130,6 +145,9 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
     // Handle commit selection
     const handleSelectCommit = useCallback(async (commit: CommitInfo) => {
         setSelectedCommit(commit);
+        setBranchCompareTarget(null);
+        setBranchDiff([]);
+        setBranchCompareMode(false);
         try {
             const git = new GitExtractor(repoPath);
             const diffs = await git.getCommitDiff(commit.hash);
@@ -186,7 +204,7 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
             }
 
             // Switch sections (only when NOT viewing a commit)
-            if (!selectedCommit) {
+            if (!selectedCommit && !branchCompareTarget) {
                 setSelectedSection(prev => {
                     if (prev === 'local') return 'staged';
                     if (prev === 'staged') return 'history';
@@ -201,13 +219,16 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
             if (focusArea === 'input') {
                 setChatInput('');
                 setFocusArea('dashboard');
-            } else if (focusArea === 'response') {
-                setFocusArea('dashboard');
             } else if (selectedCommit) {
                 // Escape also goes back from commit view
                 setSelectedCommit(null);
                 setCommitDiff([]);
                 setCompareWith(null);
+            } else if (branchCompareTarget) {
+                setBranchCompareTarget(null);
+                setBranchDiff([]);
+            } else if (branchCompareMode) {
+                setBranchCompareMode(false);
             }
             return;
         }
@@ -223,30 +244,6 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
             return;
         }
 
-        // Response scrolling mode (works same in both dashboard and commit view)
-        if (focusArea === 'response') {
-            if (key.upArrow) {
-                setResponseScrollOffset(prev => Math.max(0, prev - 1));
-                return;
-            } else if (key.downArrow) {
-                const lastResponse = chatHistory.filter(m => m.role === 'assistant').pop();
-                const lines = (lastResponse?.content || '').split('\n');
-                setResponseScrollOffset(prev => Math.min(Math.max(0, lines.length - 5), prev + 1));
-                return;
-            } else if (input === 'i' || input === '/') {
-                setFocusArea('input');
-                return;
-            } else if (input === 'c') {
-                setChatHistory([]);
-                setResponseScrollOffset(0);
-                setFocusArea('dashboard');
-                return;
-            } else if (input === 'q') {
-                setFocusArea('dashboard');
-                return;
-            }
-        }
-
         // q to quit or go back (consistent behavior)
         if (input === 'q' && focusArea === 'dashboard') {
             if (compareMode) {
@@ -254,15 +251,28 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
                 setCompareMode(false);
                 return;
             }
+            if (branchCompareMode) {
+                setBranchCompareMode(false);
+                return;
+            }
             if (selectedCommit) {
                 // Go back from commit view
                 setSelectedCommit(null);
                 setCommitDiff([]);
                 setCompareWith(null);
+            } else if (branchCompareTarget) {
+                setBranchCompareTarget(null);
+                setBranchDiff([]);
             } else {
                 // Quit app
                 exit();
             }
+            return;
+        }
+
+        // c clears chat history on dashboard
+        if (input === 'c' && focusArea === 'dashboard' && !compareMode && !branchCompareMode) {
+            setChatHistory([]);
             return;
         }
 
@@ -304,8 +314,43 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
             }
         }
 
+        if (branchCompareMode && focusArea === 'dashboard') {
+            const selectableBranches = data.branches.filter(branch => branch.name !== data.currentBranch);
+            const maxIndex = Math.max(0, selectableBranches.length - 1);
+            if (key.upArrow) {
+                setBranchCompareIndex(prev => Math.max(0, prev - 1));
+                return;
+            } else if (key.downArrow) {
+                setBranchCompareIndex(prev => Math.min(maxIndex, prev + 1));
+                return;
+            } else if (key.return) {
+                const targetBranch = selectableBranches[branchCompareIndex];
+                if (targetBranch && data.currentBranch) {
+                    setBranchCompareTarget(targetBranch);
+                    const git = new GitExtractor(repoPath);
+                    git.getBranchDiff(data.currentBranch, targetBranch.name).then(diffs => {
+                        setBranchDiff(diffs);
+                        const msg: ChatMessage = {
+                            role: 'assistant',
+                            content: `✅ Comparing branches:\n  Base: ${data.currentBranch}\n  With: ${targetBranch.name}`
+                        };
+                        setChatHistory(prev => [...prev, msg]);
+                    }).catch(err => {
+                        const msg: ChatMessage = { role: 'assistant', content: `❌ Branch compare failed: ${err.message}` };
+                        setChatHistory(prev => [...prev, msg]);
+                        setBranchCompareTarget(null);
+                    });
+                    setBranchCompareMode(false);
+                }
+                return;
+            } else if (key.escape) {
+                setBranchCompareMode(false);
+                return;
+            }
+        }
+
         // Navigate history when in history section (only on main dashboard)
-        if (selectedSection === 'history' && !selectedCommit && focusArea === 'dashboard' && !compareMode) {
+        if (selectedSection === 'history' && !selectedCommit && !branchCompareTarget && focusArea === 'dashboard' && !compareMode) {
             if (key.upArrow) {
                 setHistoryIndex(prev => Math.max(0, prev - 1));
                 return;
@@ -326,10 +371,22 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
             return;
         }
 
-        // r to browse response (works in both views)
-        if (input === 'r' && chatHistory.length > 0 && focusArea === 'dashboard' && !compareMode) {
-            setFocusArea('response');
+        if (input === 'b' && focusArea === 'dashboard' && !compareMode && !selectedCommit && !branchCompareTarget) {
+            if (data.branches.length <= 1 || !data.currentBranch) {
+                const msg: ChatMessage = { role: 'assistant', content: '⚠️ No alternate branches available to compare.' };
+                setChatHistory(prev => [...prev, msg]);
+                return;
+            }
+            setBranchCompareMode(true);
+            setBranchCompareIndex(0);
+            const msg: ChatMessage = {
+                role: 'assistant',
+                content: `🔀 Select a branch to compare with ${data.currentBranch}:\nUse ↑↓ to navigate, Enter to select, Esc to cancel`
+            };
+            setChatHistory(prev => [...prev, msg]);
+            return;
         }
+
     });
 
     // Handle chat submit
@@ -355,6 +412,9 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
                 setSelectedCommit(null);
                 setCommitDiff([]);
                 setCompareWith(null);
+                setBranchCompareTarget(null);
+                setBranchDiff([]);
+                setBranchCompareMode(false);
                 setChatInput('');
                 const msg: ChatMessage = { role: 'assistant', content: '📝 Switched to Local Changes view' };
                 setChatHistory(prev => [...prev, msg]);
@@ -367,6 +427,9 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
                 setSelectedCommit(null);
                 setCommitDiff([]);
                 setCompareWith(null);
+                setBranchCompareTarget(null);
+                setBranchDiff([]);
+                setBranchCompareMode(false);
                 setChatInput('');
                 const msg: ChatMessage = { role: 'assistant', content: '📦 Switched to Staged Changes view' };
                 setChatHistory(prev => [...prev, msg]);
@@ -379,6 +442,9 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
                 setSelectedCommit(null);
                 setCommitDiff([]);
                 setCompareWith(null);
+                setBranchCompareTarget(null);
+                setBranchDiff([]);
+                setBranchCompareMode(false);
                 setChatInput('');
                 const msg: ChatMessage = { role: 'assistant', content: `📜 Showing ${data.commits.length} recent commits. Use ↑↓ to navigate, Enter to select.` };
                 setChatHistory(prev => [...prev, msg]);
@@ -576,7 +642,6 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
 
             const assistantMessage: ChatMessage = { role: 'assistant', content: response.content };
             setChatHistory(prev => [...prev, assistantMessage]);
-            setResponseScrollOffset(0); // Reset scroll to top of new response
         } catch (err) {
             const errorMessage: ChatMessage = {
                 role: 'assistant',
@@ -751,45 +816,74 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
         );
     };
 
+    const renderBranchDiff = () => {
+        if (!branchCompareTarget) return null;
+
+        return (
+            <Box flexDirection="column" borderStyle="round" borderColor="cyan" padding={1}>
+                <Box marginBottom={1}>
+                    <Text bold color="cyan">Branch Compare: </Text>
+                    <Text color="yellow">{data.currentBranch || 'current'}</Text>
+                    <Text> → </Text>
+                    <Text color="yellow">{branchCompareTarget.name}</Text>
+                </Box>
+
+                {branchDiff.length === 0 ? (
+                    <Text color="gray">No differences found.</Text>
+                ) : (
+                    branchDiff.map((diff, i) => (
+                        <Box key={i} flexDirection="column" marginBottom={1}>
+                            <Box>
+                                <Text color={diff.isNew ? 'greenBright' : diff.isDeleted ? 'redBright' : 'yellow'} bold>
+                                    {diff.isNew ? '[NEW] ' : diff.isDeleted ? '[DEL] ' : '[MOD] '}
+                                </Text>
+                                <Text bold>{diff.newFile}</Text>
+                            </Box>
+                            {diff.hunks.slice(0, 2).map((hunk, hi) => (
+                                <Box key={hi} flexDirection="column" paddingLeft={1}>
+                                    <Text color="cyan" dimColor>{hunk.header}</Text>
+                                    {hunk.lines.slice(0, 8).map((line, li) => (
+                                        <Box key={li}>
+                                            <Text
+                                                color={line.type === 'add' ? 'greenBright' : line.type === 'delete' ? 'redBright' : 'gray'}
+                                                dimColor={line.type === 'context'}
+                                            >
+                                                {line.type === 'add' ? '+' : line.type === 'delete' ? '-' : ' '}
+                                                {line.content.slice(0, 80)}
+                                            </Text>
+                                        </Box>
+                                    ))}
+                                    {hunk.lines.length > 8 && <Text color="gray" dimColor>  ... {hunk.lines.length - 8} more lines</Text>}
+                                </Box>
+                            ))}
+                            {diff.hunks.length > 2 && <Text color="gray" dimColor>  ... {diff.hunks.length - 2} more hunks</Text>}
+                        </Box>
+                    ))
+                )}
+            </Box>
+        );
+    };
+
     // Render scrollable response
     const renderChatResponse = () => {
         if (chatHistory.length === 0) return null;
 
-        const VISIBLE_LINES = 12; // Number of lines to show at once
         const lastAssistant = chatHistory.filter(m => m.role === 'assistant').pop();
 
         if (!lastAssistant) return null;
 
         const lines = lastAssistant.content.split('\n');
-        const visibleLines = lines.slice(responseScrollOffset, responseScrollOffset + VISIBLE_LINES);
-        const canScrollUp = responseScrollOffset > 0;
-        const canScrollDown = responseScrollOffset + VISIBLE_LINES < lines.length;
 
         return (
             <Box flexDirection="column" marginTop={1}>
-                {/* Scroll indicator */}
-                {canScrollUp && (
-                    <Text color="gray" dimColor>  ▲ scroll up (↑)</Text>
-                )}
-
-                {/* Response content */}
-                <Box flexDirection="column" borderStyle={focusArea === 'response' ? 'round' : undefined} borderColor="cyan" paddingX={1}>
-                    {visibleLines.map((line, i) => (
+                {/* Render full response so nothing is hidden behind manual paging */}
+                <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
+                    {lines.map((line, i) => (
                         <Text key={i} color="white" wrap="wrap">{line}</Text>
                     ))}
                 </Box>
 
-                {/* Bottom scroll indicator */}
-                {canScrollDown && (
-                    <Text color="gray" dimColor>  ▼ scroll down (↓) - {lines.length - responseScrollOffset - VISIBLE_LINES} more lines</Text>
-                )}
-
-                {/* Response navigation hint */}
-                <Text color="gray" dimColor>
-                    {focusArea === 'response'
-                        ? '↑↓: scroll • i: type • c: clear • Esc: back'
-                        : 'Esc: browse response • c: clear'}
-                </Text>
+                <Text color="gray" dimColor>i or /: ask follow-up • c: clear • Esc: cancel input</Text>
             </Box>
         );
     };
@@ -803,6 +897,18 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
                     <>
                         <Text color="gray"> • </Text>
                         <Text color="yellow">{selectedCommit.hash.slice(0, 7)}</Text>
+                    </>
+                )}
+                {!selectedCommit && branchCompareTarget && (
+                    <>
+                        <Text color="gray"> • </Text>
+                        <Text color="yellow">{branchCompareTarget.name}</Text>
+                    </>
+                )}
+                {data.currentBranch && (
+                    <>
+                        <Text color="gray"> • </Text>
+                        <Text color="cyan">{data.currentBranch}</Text>
                     </>
                 )}
                 <Text color="gray"> • </Text>
@@ -819,13 +925,17 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
                 <Text color="gray">
                     {selectedCommit
                         ? '/: ask AI • q/Esc: back'
-                        : 'Tab: switch • /: ask AI • q: quit'}
+                        : branchCompareTarget
+                            ? 'q/Esc: back • /: ask AI'
+                            : 'Tab: switch • b: branches • /: ask AI • q: quit'}
                 </Text>
             </Box>
 
             {/* If viewing a commit, show full diff */}
             {selectedCommit ? (
                 renderCommitDiff()
+            ) : branchCompareTarget ? (
+                renderBranchDiff()
             ) : (
                 /* Unified view - all three sections */
                 <Box flexDirection="column">
@@ -839,6 +949,26 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
                     </Box>
 
                     {renderHistorySummary(selectedSection === 'history')}
+                </Box>
+            )}
+
+            {/* Branch compare selector */}
+            {branchCompareMode && !selectedCommit && (
+                <Box flexDirection="column" marginTop={1} borderStyle="round" borderColor="cyan" paddingX={1} paddingY={1}>
+                    <Text bold color="cyan">🔀 Select branch to compare with {data.currentBranch || 'current'}:</Text>
+                    <Box flexDirection="column" marginTop={1}>
+                        {data.branches.filter(branch => branch.name !== data.currentBranch).map((branch, idx) => (
+                            <Box key={branch.name}>
+                                <Text color={idx === branchCompareIndex ? 'greenBright' : 'gray'}>
+                                    {idx === branchCompareIndex ? '❯ ' : '  '}
+                                </Text>
+                                <Text color={idx === branchCompareIndex ? 'yellow' : 'gray'}>{branch.name}</Text>
+                            </Box>
+                        ))}
+                    </Box>
+                    <Box marginTop={1} flexDirection="column">
+                        <Text color="gray" dimColor>↑↓: navigate • Enter: select • Esc/q: cancel</Text>
+                    </Box>
                 </Box>
             )}
 
