@@ -16,7 +16,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ commits, onSelectCommit, isLo
         if (selectedIndex >= commits.length && commits.length > 0) {
             setSelectedIndex(0);
         }
-    }, [commits.length]);
+    }, [commits.length, selectedIndex]);
 
     useInput((input, key) => {
         if (isLoading || commits.length === 0) return;

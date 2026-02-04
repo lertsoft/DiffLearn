@@ -1,5 +1,5 @@
-import { simpleGit, SimpleGit, DiffResult } from 'simple-git';
-import { DiffParser, ParsedDiff, ParsedHunk, ParsedLine } from './parser';
+import { simpleGit, SimpleGit } from 'simple-git';
+import { DiffParser, ParsedDiff } from './parser';
 
 export interface DiffOptions {
     staged?: boolean;

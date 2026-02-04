@@ -1,6 +1,5 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { serveStatic } from 'hono/bun';
 import { GitExtractor, DiffFormatter } from '../git';
 import { loadConfig, isLLMAvailable } from '../config';
 import { LLMClient, SYSTEM_PROMPT, createExplainPrompt, createReviewPrompt, createQuestionPrompt, createSummaryPrompt } from '../llm';
@@ -392,12 +391,13 @@ export async function startAPIServer(port: number = 3000) {
                 fetch: app.fetch,
             });
             break;
-        } catch (e: any) {
-            if (e.code === 'EADDRINUSE' || e.message?.includes('Address already in use') || e.code === 'SystemError') {
+        } catch (error) {
+            const err = error as { code?: string; message?: string };
+            if (err.code === 'EADDRINUSE' || err.message?.includes('Address already in use') || err.code === 'SystemError') {
                 console.log(`Port ${currentPort} is in use, trying ${currentPort + 1}...`);
                 currentPort++;
             } else {
-                throw e;
+                throw error;
             }
         }
     }

@@ -1,7 +1,7 @@
 /**
  * Tests for the Update module
  */
-import { describe, test, expect, mock, beforeEach, afterEach } from 'bun:test';
+import { describe, test, expect } from 'bun:test';
 import {
     getCurrentVersion,
     getInstallationType,

@@ -34,7 +34,7 @@ export const App: React.FC<AppProps> = ({
     branch2,
 }) => {
     const { exit } = useApp();
-    const [mode, setMode] = useState<DiffMode>(initialMode);
+    const [mode] = useState<DiffMode>(initialMode);
     const [activeTab, setActiveTab] = useState<Tab>('local');
     const [diffs, setDiffs] = useState<ParsedDiff[]>([]);
     const [commits, setCommits] = useState<CommitInfo[]>([]);
@@ -103,7 +103,7 @@ export const App: React.FC<AppProps> = ({
             }
         };
 
-        init();
+        void init();
     }, [mode, activeTab, repoPath, commit1, commit2, branch1, branch2]);
 
     // Handle commit selection from History

@@ -2,12 +2,12 @@ import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test';
 
 let fileContent = '';
 
-mock.module('fs', () => ({
+void mock.module('fs', () => ({
     existsSync: (path: string) => path.includes('.difflearn'),
     readFileSync: () => fileContent,
 }));
 
-mock.module('os', () => ({
+void mock.module('os', () => ({
     homedir: () => '/mock/home',
 }));
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { Box, Text, useInput, useFocus } from 'ink';
 import TextInput from 'ink-text-input';
 import { ParsedDiff } from '../../git';
@@ -30,11 +30,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     const { isFocused } = useFocus({ autoFocus: true });
 
     const hunk = diff.hunks[hunkIndex];
-    const hunkPreview = hunk ? hunk.lines.slice(0, 5).map(l => {
-        const prefix = l.type === 'add' ? '+' : l.type === 'delete' ? '-' : ' ';
-        return prefix + l.content;
-    }).join('\n') : '';
-
     useInput((inputKey, key) => {
         if (!isFocused) return;
 

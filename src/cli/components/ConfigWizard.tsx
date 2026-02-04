@@ -190,7 +190,7 @@ export function ConfigWizard() {
             setProviders(updated);
             setIsLoading(false);
         }
-        checkProviders();
+        void checkProviders();
     }, []);
 
     // Load config once on mount (suppress warnings)
@@ -318,7 +318,7 @@ export function ConfigWizard() {
             lines.push(providerLine);
 
             writeFileSync(globalEnvFile, lines.filter(Boolean).join('\n') + '\n', { mode: 0o600 });
-        } catch (error) {
+        } catch (_error) {
             // Fallback to local .env
             if (existsSync(envFile)) {
                 appendFileSync(envFile, `\n${envLine}\n${providerLine}\n`);
@@ -346,7 +346,7 @@ export function ConfigWizard() {
             lines.push(`DIFFLEARN_MODEL=${model}`);
 
             writeFileSync(globalEnvFile, lines.filter(Boolean).join('\n') + '\n', { mode: 0o600 });
-        } catch (error) {
+        } catch (_error) {
             // Silently fail
         }
     }
@@ -559,7 +559,7 @@ export function ConfigWizard() {
 
                 <Box flexDirection="column" marginBottom={1}>
                     <Text bold dimColor>CLI-based (Use your subscription):</Text>
-                    {providers.filter(p => p.type === 'cli').map((p, i) => {
+                    {providers.filter(p => p.type === 'cli').map((p) => {
                         const realIndex = providers.indexOf(p);
                         return (
                             <Box key={p.id}>

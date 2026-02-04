@@ -1,7 +1,7 @@
 {
   "name": "difflearn",
   "author": "lertsoft",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Interactive git diff learning tool with LLM-powered explanations",
   "type": "module",
   "bin": {
@@ -18,6 +18,8 @@
     "build:linux-arm": "bun build src/cli/index.tsx --compile --target=bun-linux-arm64 --outfile dist/difflearn-linux-arm64",
     "build:windows": "bun build src/cli/index.tsx --compile --target=bun-windows-x64 --outfile dist/difflearn-windows-x64.exe",
     "build:all": "bun run build:macos-arm && bun run build:macos-x64 && bun run build:linux && bun run build:linux-arm && bun run build:windows",
+    "lint": "eslint . --ext .ts,.tsx",
+    "lint:fix": "eslint . --ext .ts,.tsx --fix",
     "test": "bun test",
     "serve:mcp": "bun run src/mcp/server.ts",
     "serve:api": "bun run src/api/server.ts",
@@ -41,6 +43,11 @@
     "@types/bun": "^1.1.14",
     "@types/diff": "^6.0.0",
     "@types/react": "^18.3.12",
+    "@typescript-eslint/eslint-plugin": "^8.44.0",
+    "@typescript-eslint/parser": "^8.44.0",
+    "eslint": "^9.35.0",
+    "eslint-plugin-react": "^7.37.1",
+    "eslint-plugin-react-hooks": "^5.2.0",
     "react-devtools-core": "^7.0.1",
     "typescript": "^5.7.2"
   },

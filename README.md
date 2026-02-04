@@ -55,6 +55,12 @@ bun run web
 
 # Run tests
 bun test
+
+# Run lint
+bun run lint
+
+# Auto-fix lint
+bun run lint:fix
 ```
 
 

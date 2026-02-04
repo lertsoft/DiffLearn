@@ -8,13 +8,13 @@ describe('Config', () => {
     const originalEnv = { ...process.env };
 
     // Mock fs for loadConfigFromFile
-    mock.module('fs', () => ({
+    void mock.module('fs', () => ({
         existsSync: () => false, // Default: config file doesn't exist
         readFileSync: () => '',
     }));
 
     // Also mock os.homedir to be safe
-    mock.module('os', () => ({
+    void mock.module('os', () => ({
         homedir: () => '/mock/home',
     }));
 

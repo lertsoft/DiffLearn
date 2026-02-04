@@ -89,7 +89,7 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
     // Compare mode state
     const [compareMode, setCompareMode] = useState(false);
     const [compareIndex, setCompareIndex] = useState(0);
-    const [compareWith, setCompareWith] = useState<CommitInfo | null>(null); // The second commit in comparison
+    const [, setCompareWith] = useState<CommitInfo | null>(null); // The second commit in comparison
 
     // Branch compare state
     const [branchCompareMode, setBranchCompareMode] = useState(false);
@@ -127,7 +127,7 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
                 setData({ localDiffs, stagedDiffs, commits, branches, currentBranch });
 
                 // Check for updates in background (non-blocking)
-                checkForUpdates().then(info => {
+                void checkForUpdates().then(info => {
                     if (info) setUpdateInfo(info);
                 }).catch(() => {
                     // Silently ignore update check failures
@@ -139,7 +139,7 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
             }
         };
 
-        init();
+        void init();
     }, [repoPath]);
 
     // Handle commit selection
@@ -328,7 +328,7 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
                 if (targetBranch && data.currentBranch) {
                     setBranchCompareTarget(targetBranch);
                     const git = new GitExtractor(repoPath);
-                    git.getBranchDiff(data.currentBranch, targetBranch.name).then(diffs => {
+                    void git.getBranchDiff(data.currentBranch, targetBranch.name).then(diffs => {
                         setBranchDiff(diffs);
                         const msg: ChatMessage = {
                             role: 'assistant',
@@ -359,7 +359,7 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
                 return;
             } else if (key.return) {
                 if (data.commits[historyIndex]) {
-                    handleSelectCommit(data.commits[historyIndex]);
+                    void handleSelectCommit(data.commits[historyIndex]);
                 }
                 return;
             }
@@ -550,7 +550,7 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
                 const msg: ChatMessage = { role: 'assistant', content: '🔍 Checking for updates...' };
                 setChatHistory(prev => [...prev, msg]);
 
-                checkForUpdates().then(info => {
+                void checkForUpdates().then(info => {
                     if (info) {
                         setUpdateInfo(info);
                         const updateMsg: ChatMessage = { role: 'assistant', content: formatUpdateMessage(info) };
@@ -653,7 +653,7 @@ export const UnifiedDashboard: React.FC<UnifiedDashboardProps> = ({
             // Keep input focused for follow-up questions
             setFocusArea('input');
         }
-    }, [llmClient, selectedCommit, commitDiff, selectedSection, data]);
+    }, [llmClient, selectedCommit, commitDiff, selectedSection, data, getMatchingCommands, hasChangesToAnalyze]);
 
     if (error) {
         return (

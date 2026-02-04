@@ -2,7 +2,7 @@
  * Tests for the DiffParser module
  */
 import { describe, test, expect } from 'bun:test';
-import { DiffParser, ParsedDiff, ParsedHunk } from '../src/git/parser';
+import { DiffParser } from '../src/git/parser';
 
 const sampleDiff = `diff --git a/src/example.ts b/src/example.ts
 index abc123..def456 100644

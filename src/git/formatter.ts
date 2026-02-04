@@ -1,5 +1,6 @@
 import chalk from 'chalk';
-import { ParsedDiff, ParsedHunk, ParsedLine } from './parser';
+import { ParsedDiff } from './parser';
+import type { ParsedLine } from './parser';
 
 export type OutputFormat = 'terminal' | 'markdown' | 'json';
 

@@ -5,7 +5,7 @@ import { LLMClient } from "../src/llm/client";
 import { Config } from "../src/config";
 
 // Mock Child Process Spawner
-const mockSpawn = mock((command, args, options) => {
+const mockSpawn = mock((_command, _args, _options) => {
     const proc: any = new EventEmitter();
     proc.stdout = new EventEmitter();
     proc.stderr = new EventEmitter();

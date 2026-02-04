@@ -1,6 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Box, Text, useInput, useFocus } from 'ink';
-import { ParsedDiff, ParsedHunk, ParsedLine } from '../../git';
+import { ParsedDiff } from '../../git';
+import type { ParsedHunk, ParsedLine } from '../../git';
 
 interface DiffViewerProps {
     diffs: ParsedDiff[];
@@ -19,7 +20,6 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
     onAskQuestion
 }) => {
     const [selectedHunk, setSelectedHunk] = useState<HunkPosition>({ diffIndex: 0, hunkIndex: 0 });
-    const [scrollOffset, setScrollOffset] = useState(0);
     const { isFocused } = useFocus({ autoFocus: true });
 
     // Build flat list of all hunks for navigation

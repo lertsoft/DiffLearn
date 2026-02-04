@@ -3,7 +3,7 @@ import { describe, test, expect, mock } from 'bun:test';
 let lastOpenAIPayload: any = null;
 let lastAnthropicPayload: any = null;
 
-mock.module('openai', () => ({
+void mock.module('openai', () => ({
     default: class OpenAI {
         chat = {
             completions: {
@@ -26,7 +26,7 @@ mock.module('openai', () => ({
     },
 }));
 
-mock.module('@anthropic-ai/sdk', () => ({
+void mock.module('@anthropic-ai/sdk', () => ({
     default: class Anthropic {
         messages = {
             create: async (payload: any) => {
@@ -47,7 +47,7 @@ mock.module('@anthropic-ai/sdk', () => ({
     },
 }));
 
-mock.module('@google/generative-ai', () => ({
+void mock.module('@google/generative-ai', () => ({
     GoogleGenerativeAI: class GoogleGenerativeAI {
         getGenerativeModel() {
             return {

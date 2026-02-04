@@ -9,6 +9,17 @@ export type LLMProvider =
     | 'codex'
     | 'cursor-cli';
 
+type SpawnStdio = Array<'pipe' | 'inherit' | 'ignore'> | 'pipe' | 'inherit' | 'ignore';
+
+interface SpawnLikeProcess {
+    stdout: { on: (event: 'data', listener: (data: Buffer | string) => void) => void };
+    stderr: { on: (event: 'data', listener: (data: Buffer | string) => void) => void };
+    stdin: { write: (input: string) => void; end: () => void };
+    on: (event: string, listener: (...args: unknown[]) => void) => void;
+}
+
+export type SpawnLike = (command: string, args: string[], options: { stdio?: SpawnStdio }) => SpawnLikeProcess;
+
 export interface Config {
     provider: LLMProvider;
     model: string;
@@ -17,7 +28,7 @@ export interface Config {
     temperature?: number;
     maxTokens?: number;
     useCLI: boolean;  // Whether using CLI-based provider
-    spawner?: (command: string, args: string[], options: any) => any; // For testing
+    spawner?: SpawnLike; // For testing
 }
 
 interface ProviderDefaults {
