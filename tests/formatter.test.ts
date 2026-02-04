@@ -11,6 +11,7 @@ const mockDiff: ParsedDiff = {
     isNew: false,
     isDeleted: false,
     isRenamed: false,
+    isBinary: false,
     additions: 2,
     deletions: 1,
     hunks: [
@@ -37,6 +38,7 @@ const newFileDiff: ParsedDiff = {
     isNew: true,
     isDeleted: false,
     isRenamed: false,
+    isBinary: false,
     additions: 3,
     deletions: 0,
     hunks: [
@@ -50,6 +52,30 @@ const newFileDiff: ParsedDiff = {
                 { type: 'add', content: 'export function newFunction() {', newLineNumber: 1 },
                 { type: 'add', content: "  return 'hello';", newLineNumber: 2 },
                 { type: 'add', content: '}', newLineNumber: 3 },
+            ],
+        },
+    ],
+};
+
+const renamedDiff: ParsedDiff = {
+    oldFile: 'src/old-name.ts',
+    newFile: 'src/new-name.ts',
+    isNew: false,
+    isDeleted: false,
+    isRenamed: true,
+    isBinary: false,
+    additions: 1,
+    deletions: 1,
+    hunks: [
+        {
+            header: '@@ -1,1 +1,1 @@',
+            oldStart: 1,
+            oldLines: 1,
+            newStart: 1,
+            newLines: 1,
+            lines: [
+                { type: 'delete', content: 'export const name = "old";', oldLineNumber: 1 },
+                { type: 'add', content: 'export const name = "new";', newLineNumber: 1 },
             ],
         },
     ],
@@ -78,6 +104,28 @@ describe('DiffFormatter', () => {
             const result = formatter.toTerminal([]);
             expect(result).toBe('');
         });
+
+        test('should omit stats when disabled', () => {
+            const result = formatter.toTerminal([mockDiff], { showStats: false });
+
+            expect(result).not.toContain('  +2');
+            expect(result).not.toContain('  -1');
+        });
+
+        test('should omit line numbers when disabled', () => {
+            const result = formatter.toTerminal([mockDiff], { showLineNumbers: false });
+
+            expect(result).toContain('+const newValue = 100;');
+            expect(result).not.toContain('│');
+        });
+
+        test('should label renamed files', () => {
+            const result = formatter.toTerminal([renamedDiff]);
+
+            expect(result).toContain('Renamed');
+            expect(result).toContain('old-name.ts');
+            expect(result).toContain('new-name.ts');
+        });
     });
 
     describe('toMarkdown()', () => {
@@ -101,6 +149,13 @@ describe('DiffFormatter', () => {
             const result = formatter.toMarkdown([newFileDiff]);
 
             expect(result).toContain('new-file.ts');
+        });
+
+        test('should include renamed file status', () => {
+            const result = formatter.toMarkdown([renamedDiff]);
+
+            expect(result).toContain('(renamed)');
+            expect(result).toContain('new-name.ts');
         });
     });
 

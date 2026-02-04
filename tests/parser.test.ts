@@ -40,6 +40,48 @@ index abc123..0000000
 -}
 `;
 
+const binaryDiff = `diff --git a/assets/logo.png b/assets/logo.png
+index 1111111..2222222 100644
+Binary files a/assets/logo.png and b/assets/logo.png differ
+`;
+
+const renameDiff = `diff --git a/src/old-name.ts b/src/new-name.ts
+similarity index 98%
+rename from src/old-name.ts
+rename to src/new-name.ts
+index abc123..def456 100644
+--- a/src/old-name.ts
++++ b/src/new-name.ts
+@@ -1,2 +1,2 @@
+-export const name = 'old';
++export const name = 'new';
+`;
+
+const multiHunkDiff = `diff --git a/src/multi.ts b/src/multi.ts
+index abc123..def456 100644
+--- a/src/multi.ts
++++ b/src/multi.ts
+@@ -1,3 +1,3 @@
+ const a = 1;
+-const b = 2;
++const b = 3;
+ const c = 4;
+@@ -10,3 +10,4 @@
+ function demo() {
+   return 1;
++  // extra
+ }
+`;
+
+const noCountHunkDiff = `diff --git a/src/nocount.ts b/src/nocount.ts
+index abc123..def456 100644
+--- a/src/nocount.ts
++++ b/src/nocount.ts
+@@ -1 +1 @@
+-const value = 1;
++const value = 2;
+`;
+
 describe('DiffParser', () => {
     const parser = new DiffParser();
 
@@ -118,6 +160,38 @@ describe('DiffParser', () => {
 
             expect(result.length).toBe(2);
         });
+
+        test('should detect binary diffs', () => {
+            const result = parser.parse(binaryDiff);
+
+            expect(result.length).toBe(1);
+            expect(result[0].isBinary).toBe(true);
+        });
+
+        test('should detect renamed files', () => {
+            const result = parser.parse(renameDiff);
+
+            expect(result.length).toBe(1);
+            expect(result[0].isRenamed).toBe(true);
+            expect(result[0].oldFile).toBe('src/old-name.ts');
+            expect(result[0].newFile).toBe('src/new-name.ts');
+        });
+
+        test('should parse multiple hunks in one file', () => {
+            const result = parser.parse(multiHunkDiff);
+
+            expect(result.length).toBe(1);
+            expect(result[0].hunks.length).toBe(2);
+        });
+
+        test('should parse hunks without explicit line counts', () => {
+            const result = parser.parse(noCountHunkDiff);
+
+            expect(result.length).toBe(1);
+            expect(result[0].hunks.length).toBe(1);
+            expect(result[0].hunks[0].oldLines).toBe(1);
+            expect(result[0].hunks[0].newLines).toBe(1);
+        });
     });
 
     describe('line numbers', () => {
@@ -132,6 +206,34 @@ describe('DiffParser', () => {
             // Context and add lines should have new line numbers
             const addLines = lines.filter(l => l.type === 'add');
             expect(addLines.every(l => l.newLineNumber !== undefined)).toBe(true);
+        });
+    });
+
+    describe('toUnifiedFormat()', () => {
+        test('should round-trip a parsed diff to unified format', () => {
+            const parsed = parser.parse(sampleDiff);
+            const unified = parser.toUnifiedFormat(parsed[0]);
+
+            expect(unified).toContain('diff --git a/src/example.ts b/src/example.ts');
+            expect(unified).toContain('@@ -1,5 +1,6 @@');
+            expect(unified).toContain('+const newValue = 100;');
+        });
+
+        test('should include new file headers', () => {
+            const parsed = parser.parse(newFileDiff);
+            const unified = parser.toUnifiedFormat(parsed[0]);
+
+            expect(unified).toContain('new file mode');
+            expect(unified).toContain('--- /dev/null');
+            expect(unified).toContain('+++ b/src/new-file.ts');
+        });
+
+        test('should include deleted file headers', () => {
+            const parsed = parser.parse(deletedFileDiff);
+            const unified = parser.toUnifiedFormat(parsed[0]);
+
+            expect(unified).toContain('deleted file mode');
+            expect(unified).toContain('+++ /dev/null');
         });
     });
 });

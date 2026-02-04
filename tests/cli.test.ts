@@ -1,9 +1,23 @@
 /**
  * Tests for the CLI commands
  */
-import { describe, test, expect } from 'bun:test';
+import { describe, test, expect, beforeAll } from 'bun:test';
+import { GitExtractor } from '../src/git/extractor';
 
 describe('CLI', () => {
+    let commitHash = '';
+    let branch1 = '';
+    let branch2 = '';
+
+    beforeAll(async () => {
+        const git = new GitExtractor(process.cwd());
+        const commits = await git.getCommitHistory(2);
+        commitHash = commits[0]?.hash || '';
+
+        const branches = await git.getBranches();
+        branch1 = branches[0]?.name || '';
+        branch2 = branches[1]?.name || branches[0]?.name || '';
+    });
     const runCLI = async (args: string[], envOverrides: Record<string, string> = {}) => {
         const proc = Bun.spawn(['bun', 'run', 'src/cli/index.tsx', ...args], {
             cwd: process.cwd(),
@@ -119,6 +133,26 @@ describe('CLI', () => {
             const { exitCode } = await runCLI(['local', '--staged', '--no-interactive']);
 
             expect(exitCode).toBe(0);
+        });
+    });
+
+    describe('commit command', () => {
+        test('should print commit diff in non-interactive mode', async () => {
+            if (!commitHash) return;
+            const { exitCode, stdout } = await runCLI(['commit', commitHash, '--no-interactive']);
+
+            expect(exitCode).toBe(0);
+            expect(typeof stdout).toBe('string');
+        });
+    });
+
+    describe('branch command', () => {
+        test('should print branch diff in non-interactive mode', async () => {
+            if (!branch1 || !branch2) return;
+            const { exitCode, stdout } = await runCLI(['branch', branch1, branch2, '--no-interactive']);
+
+            expect(exitCode).toBe(0);
+            expect(typeof stdout).toBe('string');
         });
     });
 

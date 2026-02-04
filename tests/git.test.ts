@@ -39,6 +39,17 @@ describe('GitExtractor', () => {
         });
     });
 
+    describe('getAllLocalChanges()', () => {
+        test('should return staged and unstaged arrays', async () => {
+            const result = await git.getAllLocalChanges();
+
+            expect(result).toHaveProperty('staged');
+            expect(result).toHaveProperty('unstaged');
+            expect(result.staged).toBeArray();
+            expect(result.unstaged).toBeArray();
+        });
+    });
+
     describe('getCommitHistory()', () => {
         test('should return array of commits', async () => {
             const commits = await git.getCommitHistory(5);
@@ -77,6 +88,13 @@ describe('GitExtractor', () => {
 
                 expect(diffs).toBeArray();
             }
+        });
+    });
+
+    describe('getFileDiff()', () => {
+        test('should return array for file diff', async () => {
+            const diffs = await git.getFileDiff('README.md');
+            expect(diffs).toBeArray();
         });
     });
 
