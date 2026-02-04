@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
-import { loadConfig, detectProvider, detectCLIProvider, isCLIAvailable, LLMProvider } from '../../config';
+import {
+    loadConfig,
+    isCLIAvailable,
+    isCursorAgentAvailable,
+    getCLIAuthCommand,
+    getCLIAuthHint,
+    getCLIAuthStatusCommand,
+    LLMProvider,
+} from '../../config';
 import { spawn } from 'child_process';
 import { existsSync, readFileSync, writeFileSync, appendFileSync } from 'fs';
 import { join } from 'path';
@@ -12,6 +20,8 @@ interface ProviderInfo {
     type: 'cli' | 'api' | 'local';
     description: string;
     authCommand?: string[];
+    authHint?: string[];
+    authStatusCommand?: string[];
     envKey?: string;
     installed?: boolean;
     configured?: boolean;
@@ -40,28 +50,36 @@ const PROVIDERS: ProviderInfo[] = [
         name: 'Gemini CLI',
         type: 'cli',
         description: 'Use your Google Gemini subscription',
-        authCommand: ['gemini', 'auth', 'login'],
+        authCommand: getCLIAuthCommand('gemini-cli'),
+        authHint: getCLIAuthHint('gemini-cli'),
+        authStatusCommand: getCLIAuthStatusCommand('gemini-cli'),
     },
     {
         id: 'claude-code',
         name: 'Claude Code',
         type: 'cli',
         description: 'Use your Anthropic subscription',
-        authCommand: ['claude', 'auth', 'login'],
+        authCommand: getCLIAuthCommand('claude-code'),
+        authHint: getCLIAuthHint('claude-code'),
+        authStatusCommand: getCLIAuthStatusCommand('claude-code'),
     },
     {
         id: 'codex',
         name: 'OpenAI Codex CLI',
         type: 'cli',
         description: 'Use your OpenAI subscription',
-        authCommand: ['codex', 'auth'],
+        authCommand: getCLIAuthCommand('codex'),
+        authHint: getCLIAuthHint('codex'),
+        authStatusCommand: getCLIAuthStatusCommand('codex'),
     },
     {
         id: 'cursor-cli',
         name: 'Cursor',
         type: 'cli',
         description: 'Use your Cursor subscription',
-        authCommand: ['cursor', '--login'],
+        authCommand: getCLIAuthCommand('cursor-cli'),
+        authHint: getCLIAuthHint('cursor-cli'),
+        authStatusCommand: getCLIAuthStatusCommand('cursor-cli'),
     },
     // API-based providers
     {
@@ -152,8 +170,13 @@ export function ConfigWizard() {
             const updated = await Promise.all(
                 PROVIDERS.map(async (p) => {
                     if (p.type === 'cli') {
-                        const cmd = p.authCommand?.[0] || '';
-                        const installed = await isCLIAvailable(cmd);
+                        let installed = false;
+                        if (p.id === 'cursor-cli') {
+                            installed = await isCursorAgentAvailable();
+                        } else {
+                            const cmd = p.authCommand?.[0] || '';
+                            installed = cmd ? await isCLIAvailable(cmd) : false;
+                        }
                         return { ...p, installed };
                     } else if (p.type === 'local') {
                         const running = await isLocalProviderRunning(p);
@@ -328,6 +351,41 @@ export function ConfigWizard() {
         }
     }
 
+    async function runStatusCommand(command: string[]): Promise<{ code: number | null; output: string }> {
+        return new Promise((resolve) => {
+            const proc = spawn(command[0], command.slice(1), {
+                stdio: ['ignore', 'pipe', 'pipe'],
+            });
+
+            let stdout = '';
+            let stderr = '';
+
+            proc.stdout.on('data', (data: Buffer | string) => { stdout += data.toString(); });
+            proc.stderr.on('data', (data: Buffer | string) => { stderr += data.toString(); });
+
+            proc.on('close', (code) => {
+                const output = (stdout || stderr || '').trim();
+                resolve({ code, output });
+            });
+
+            proc.on('error', (err: Error) => {
+                resolve({ code: -1, output: err.message });
+            });
+        });
+    }
+
+    function inferAuthStatus(output: string, exitCode: number | null): boolean {
+        const lower = output.toLowerCase();
+        const unauthPatterns = ['not authenticated', 'not logged', 'unauthenticated', 'login required', 'not logged in'];
+        const authPatterns = ['authenticated', 'logged in', 'signed in'];
+
+        if (unauthPatterns.some((pattern) => lower.includes(pattern))) return false;
+        if (authPatterns.some((pattern) => lower.includes(pattern))) return true;
+
+        return exitCode === 0;
+    }
+
+
     function runAuthCommand(provider: ProviderInfo) {
         if (!provider.authCommand) return;
 
@@ -351,13 +409,31 @@ export function ConfigWizard() {
         });
 
         proc.on('close', (code) => {
-            if (code === 0) {
-                console.log(`\n✅ ${provider.name} authenticated successfully!`);
-                console.log(`\nRun 'difflearn config' again to verify.\n`);
-            } else {
-                console.log(`\n⚠️ Authentication may have failed. Try running '${provider.authCommand?.join(' ')}' manually.\n`);
-            }
-            process.exit(0);
+            void (async () => {
+                if (code === 0) {
+                    if (provider.authStatusCommand?.length) {
+                        const status = await runStatusCommand(provider.authStatusCommand);
+                        const isAuthed = inferAuthStatus(status.output, status.code);
+
+                        if (isAuthed) {
+                            console.log(`\n✅ ${provider.name} authenticated successfully!`);
+                        } else {
+                            console.log(`\n⚠️ ${provider.name} may not be logged in yet.`);
+                        }
+
+                        if (status.output) {
+                            console.log(`\nStatus: ${status.output}`);
+                        }
+                    } else {
+                        console.log(`\n✅ ${provider.name} login flow finished.`);
+                    }
+
+                    console.log(`\nRun 'difflearn config' again to verify.\n`);
+                } else {
+                    console.log(`\n⚠️ Authentication may have failed. Try running '${provider.authCommand?.join(' ')}' manually.\n`);
+                }
+                process.exit(0);
+            })();
         });
     }
 
@@ -522,18 +598,22 @@ export function ConfigWizard() {
 
     // CLI Auth Screen
     if (screen === 'cli-auth' && currentProvider) {
+        const authHints = currentProvider.authHint || [];
         return (
             <Box flexDirection="column" padding={1}>
                 <Box marginBottom={1}>
                     <Text bold color="cyan">🔐 Authenticate {currentProvider.name}</Text>
                 </Box>
 
-                <Text>This will run the authentication command:</Text>
+                <Text>This will start the login flow:</Text>
                 <Box marginY={1}>
                     <Text color="yellow" bold>{currentProvider.authCommand?.join(' ')}</Text>
                 </Box>
 
                 <Text dimColor>This opens an interactive session.</Text>
+                {authHints.map((hint: string) => (
+                    <Text key={hint} dimColor>{hint}</Text>
+                ))}
                 <Text dimColor>After authenticating, run 'difflearn config' again.</Text>
 
                 <Box marginTop={1}>

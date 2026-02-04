@@ -2,7 +2,7 @@
  * Tests for the Config module
  */
 import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test';
-import { loadConfig, isLLMAvailable, detectProvider, isCLIAvailable, getCLICommand } from '../src/config';
+import { loadConfig, isLLMAvailable, detectProvider, isCLIAvailable, getCLICommand, getCLIAuthCommand } from '../src/config';
 
 describe('Config', () => {
     const originalEnv = { ...process.env };
@@ -219,11 +219,33 @@ describe('Config', () => {
         });
 
         test('should return correct command for cursor-cli', () => {
-            expect(getCLICommand('cursor-cli')).toBe('cursor');
+            expect(getCLICommand('cursor-cli')).toBe('agent');
         });
 
         test('should return undefined for non-CLI providers', () => {
             expect(getCLICommand('openai')).toBeUndefined();
+        });
+    });
+
+    describe('getCLIAuthCommand()', () => {
+        test('should return correct auth command for gemini-cli', () => {
+            expect(getCLIAuthCommand('gemini-cli')).toEqual(['gemini']);
+        });
+
+        test('should return correct auth command for claude-code', () => {
+            expect(getCLIAuthCommand('claude-code')).toEqual(['claude']);
+        });
+
+        test('should return correct auth command for cursor-cli', () => {
+            expect(getCLIAuthCommand('cursor-cli')).toEqual(['agent', 'login']);
+        });
+
+        test('should return correct auth command for codex', () => {
+            expect(getCLIAuthCommand('codex')).toEqual(['codex', 'login']);
+        });
+
+        test('should return undefined for non-CLI providers', () => {
+            expect(getCLIAuthCommand('openai')).toBeUndefined();
         });
     });
 

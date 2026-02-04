@@ -121,7 +121,37 @@ describe("LLMClient", () => {
         expect(mockSpawn).toHaveBeenCalled();
         const call = mockSpawn.mock.calls[0];
         expect(call[0]).toBe('codex');
+        expect(call[1]).toEqual(['exec', '-']);
         const proc = mockSpawn.mock.results[0].value;
         expect(proc.stdin.write).toHaveBeenCalled();
+        expect(proc.stdin.write.mock.calls[0][0]).toContain('User: codex input');
+        expect(proc.stdin.end).toHaveBeenCalled();
+    });
+
+    test("CLI auth failures include a provider-specific auth hint", async () => {
+        const authErrorSpawn = mock(() => {
+            const proc: any = new EventEmitter();
+            proc.stdout = new EventEmitter();
+            proc.stderr = new EventEmitter();
+            proc.stdin = { write: mock(), end: mock() };
+            setTimeout(() => {
+                proc.stderr.emit('data', 'Not logged in. Please login first.');
+                proc.emit('close', 1);
+            }, 10);
+            return proc;
+        });
+
+        const config: Config = {
+            provider: 'codex',
+            useCLI: true,
+            apiKey: '',
+            model: '',
+            spawner: authErrorSpawn
+        };
+        const client = new LLMClient(config);
+
+        await expect(client.chat([{ role: 'user', content: 'auth test' }]))
+            .rejects
+            .toThrow('Try authenticating first: codex login');
     });
 });

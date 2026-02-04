@@ -25,6 +25,9 @@ interface ProviderDefaults {
     envKey: string;
     cli?: boolean;
     command?: string;
+    authCommand?: string[];
+    authHint?: string[];
+    authStatusCommand?: string[];
     baseUrl?: string;  // Default API base URL
     noApiKey?: boolean;  // Provider doesn't require API key
 }
@@ -37,10 +40,42 @@ const PROVIDER_DEFAULTS: Record<LLMProvider, ProviderDefaults> = {
     ollama: { model: 'llama3.2', envKey: '', baseUrl: 'http://localhost:11434/v1', noApiKey: true },
     lmstudio: { model: 'local-model', envKey: '', baseUrl: 'http://localhost:1234/v1', noApiKey: true },
     // CLI-based providers (use existing subscriptions)
-    'gemini-cli': { model: 'gemini', envKey: '', cli: true, command: 'gemini' },
-    'claude-code': { model: 'claude', envKey: '', cli: true, command: 'claude' },
-    'codex': { model: 'codex', envKey: '', cli: true, command: 'codex' },
-    'cursor-cli': { model: 'cursor', envKey: '', cli: true, command: 'cursor' },
+    'gemini-cli': {
+        model: 'gemini',
+        envKey: '',
+        cli: true,
+        command: 'gemini',
+        authCommand: ['gemini'],
+        authHint: [
+            'When prompted, choose Login with Google or Use API key.',
+            'Complete the browser sign-in flow if it opens.',
+        ],
+    },
+    'claude-code': {
+        model: 'claude',
+        envKey: '',
+        cli: true,
+        command: 'claude',
+        authCommand: ['claude'],
+        authHint: ['At the prompt, run /login and follow the instructions.'],
+    },
+    'codex': {
+        model: 'codex',
+        envKey: '',
+        cli: true,
+        command: 'codex',
+        authCommand: ['codex', 'login'],
+        authStatusCommand: ['codex', 'login', 'status'],
+    },
+    'cursor-cli': {
+        model: 'cursor',
+        envKey: '',
+        cli: true,
+        command: 'agent',
+        authCommand: ['agent', 'login'],
+        authStatusCommand: ['agent', 'status'],
+        authHint: ['For scripts, you can set CURSOR_API_KEY.'],
+    },
 };
 
 /**
@@ -51,6 +86,29 @@ export async function isCLIAvailable(command: string): Promise<boolean> {
         const proc = Bun.spawn(['which', command], { stdout: 'pipe', stderr: 'pipe' });
         const exitCode = await proc.exited;
         return exitCode === 0;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Check if a Cursor CLI agent binary is available
+ */
+export async function isCursorAgentAvailable(): Promise<boolean> {
+    try {
+        const isInstalled = await isCLIAvailable('agent');
+        if (!isInstalled) return false;
+
+        const proc = Bun.spawn(['agent', '--version'], { stdout: 'pipe', stderr: 'pipe' });
+        const [stdout, stderr] = await Promise.all([
+            new Response(proc.stdout).text(),
+            new Response(proc.stderr).text(),
+        ]);
+        const exitCode = await proc.exited;
+        if (exitCode !== 0) return false;
+
+        const output = `${stdout}\n${stderr}`.toLowerCase();
+        return output.includes('cursor');
     } catch {
         return false;
     }
@@ -171,7 +229,7 @@ export async function detectCLIProvider(): Promise<LLMProvider | null> {
     if (await isCLIAvailable('gemini')) return 'gemini-cli';
     if (await isCLIAvailable('claude')) return 'claude-code';
     if (await isCLIAvailable('codex')) return 'codex';
-    if (await isCLIAvailable('cursor')) return 'cursor-cli';
+    if (await isCursorAgentAvailable()) return 'cursor-cli';
     return null;
 }
 
@@ -180,4 +238,25 @@ export async function detectCLIProvider(): Promise<LLMProvider | null> {
  */
 export function getCLICommand(provider: LLMProvider): string | undefined {
     return PROVIDER_DEFAULTS[provider]?.command;
+}
+
+/**
+ * Get CLI authentication command for a provider
+ */
+export function getCLIAuthCommand(provider: LLMProvider): string[] | undefined {
+    return PROVIDER_DEFAULTS[provider]?.authCommand;
+}
+
+/**
+ * Get CLI authentication hint text for a provider
+ */
+export function getCLIAuthHint(provider: LLMProvider): string[] | undefined {
+    return PROVIDER_DEFAULTS[provider]?.authHint;
+}
+
+/**
+ * Get CLI authentication status command for a provider
+ */
+export function getCLIAuthStatusCommand(provider: LLMProvider): string[] | undefined {
+    return PROVIDER_DEFAULTS[provider]?.authStatusCommand;
 }

@@ -150,7 +150,23 @@ Use your existing AI subscriptions without extra API costs:
 | **Gemini CLI** | [Install gemini-cli](https://github.com/google-gemini/gemini-cli) |
 | **Claude Code** | [Install claude](https://docs.anthropic.com/en/docs/claude-code) |
 | **OpenAI Codex** | [Install codex](https://github.com/openai/codex) |
-| **Cursor** | Cursor IDE installed |
+| **Cursor** | [Install Cursor CLI](https://cursor.com/docs/cli/overview) |
+
+Login commands (provider-specific):
+
+```bash
+# Gemini CLI (interactive login selection)
+gemini
+
+# Claude Code (interactive, then type /login)
+claude
+
+# OpenAI Codex
+codex login
+
+# Cursor CLI
+agent login
+```
 
 ```bash
 # Check which providers are available

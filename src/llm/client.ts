@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { Config, LLMProvider, getCLICommand } from '../config';
+import { Config, getCLIAuthCommand, getCLIAuthHint } from '../config';
 import { spawn } from 'child_process';
 
 export interface ChatMessage {
@@ -77,7 +77,7 @@ export class LLMClient {
     }
 
     /**
-     * Chat using CLI tools (gemini, claude, cursor-agent)
+     * Chat using CLI tools (gemini, claude, cursor)
      */
     private async chatCLI(messages: ChatMessage[]): Promise<LLMResponse> {
         // Combine messages into a single prompt
@@ -116,34 +116,67 @@ export class LLMClient {
      * Execute Gemini CLI: gemini prompt (via stdin)
      */
     private async execGeminiCLI(prompt: string): Promise<string> {
-        return this.execCLIWithStdin('gemini', [], prompt);
+        return this.execCLIWithStdin('gemini', [], prompt, {
+            authCommand: getCLIAuthCommand('gemini-cli'),
+            authHint: getCLIAuthHint('gemini-cli'),
+        });
     }
 
     /**
      * Execute Claude Code CLI: claude -p "prompt"
      */
     private async execClaudeCLI(prompt: string): Promise<string> {
-        return this.execCLIWithStdin('claude', ['-p', prompt], '');
+        return this.execCLIWithStdin('claude', ['-p', prompt], '', {
+            authCommand: getCLIAuthCommand('claude-code'),
+            authHint: getCLIAuthHint('claude-code'),
+        });
     }
 
     /**
-     * Execute Cursor CLI: cursor-agent chat "prompt"
+     * Execute Cursor CLI: agent -p "prompt"
      */
     private async execCursorCLI(prompt: string): Promise<string> {
-        return this.execCLIWithStdin('cursor-agent', ['chat', prompt], '');
+        const authOptions = {
+            authCommand: getCLIAuthCommand('cursor-cli'),
+            authHint: getCLIAuthHint('cursor-cli'),
+        };
+
+        try {
+            return await this.execCLIWithStdin('agent', ['-p', prompt, '--output-format', 'text'], '', authOptions);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            const lower = message.toLowerCase();
+            const hasFlag = lower.includes('output-format');
+            const flagError = ['unknown', 'unrecognized', 'unexpected', 'invalid'].some((token) => lower.includes(token));
+
+            if (hasFlag && flagError) {
+                return this.execCLIWithStdin('agent', ['-p', prompt], '', authOptions);
+            }
+
+            throw error;
+        }
     }
 
     /**
      * Execute Codex CLI
      */
     private async execCodexCLI(prompt: string): Promise<string> {
-        return this.execCLIWithStdin('codex', [], prompt);
+        // Use non-interactive mode and read prompt from stdin for reliable automation.
+        return this.execCLIWithStdin('codex', ['exec', '-'], prompt, {
+            authCommand: getCLIAuthCommand('codex'),
+            authHint: getCLIAuthHint('codex'),
+        });
     }
 
     /**
      * Helper to execute CLI command with stdin
      */
-    private async execCLIWithStdin(command: string, args: string[], input: string): Promise<string> {
+    private async execCLIWithStdin(
+        command: string,
+        args: string[],
+        input: string,
+        options?: { authCommand?: string[]; authHint?: string[] }
+    ): Promise<string> {
         return new Promise((resolve, reject) => {
             const spawnFn = this.config.spawner || spawn;
             const proc = spawnFn(command, args, {
@@ -160,7 +193,9 @@ export class LLMClient {
                 if (code === 0) {
                     resolve(stdout.trim());
                 } else {
-                    reject(new Error(`${command} failed (code ${code}): ${stderr || stdout}`));
+                    const errorOutput = (stderr || stdout || '').trim();
+                    const authHint = this.buildAuthHint(errorOutput, options?.authCommand, options?.authHint);
+                    reject(new Error(`${command} failed (code ${code}): ${errorOutput}${authHint}`));
                 }
             });
 
@@ -170,9 +205,30 @@ export class LLMClient {
 
             if (input) {
                 proc.stdin.write(input);
-                proc.stdin.end();
             }
+            proc.stdin.end();
         });
+    }
+
+    private buildAuthHint(output: string, authCommand?: string[], authHint?: string[]): string {
+        const hasCommand = !!authCommand?.length;
+        const hasHint = !!authHint?.length;
+        if (!hasCommand && !hasHint) return '';
+
+        const lower = output.toLowerCase();
+        const authPatterns = ['auth', 'login', 'unauthorized', 'not logged', 'credential', 'api key', 'forbidden'];
+        if (!authPatterns.some((pattern) => lower.includes(pattern))) {
+            return '';
+        }
+
+        const lines: string[] = [];
+        if (hasCommand) {
+            lines.push(`Try authenticating first: ${authCommand?.join(' ')}`);
+        }
+        if (hasHint) {
+            lines.push(...(authHint || []));
+        }
+        return `\n${lines.join('\n')}`;
     }
 
     private async chatOpenAI(messages: ChatMessage[]): Promise<LLMResponse> {
