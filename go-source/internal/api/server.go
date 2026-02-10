@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"difflearn-go/internal/config"
 	"difflearn-go/internal/git"
 	"difflearn-go/internal/llm"
+	webassets "difflearn-go/web"
 )
 
 func StartAPIServer(port int, repoPath string) error {
@@ -24,10 +26,7 @@ func StartAPIServer(port int, repoPath string) error {
 	g := git.NewGitExtractor(repoPath)
 	formatter := git.NewDiffFormatter()
 
-	webDir, err := findWebDir(repoPath)
-	if err != nil {
-		return err
-	}
+	webDir, hasDiskWeb := findWebDir(repoPath)
 
 	mux := http.NewServeMux()
 	withCORS := func(h http.HandlerFunc) http.HandlerFunc {
@@ -44,16 +43,16 @@ func StartAPIServer(port int, repoPath string) error {
 	}
 
 	mux.HandleFunc("/styles.css", withCORS(func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, filepath.Join(webDir, "styles.css"))
+		serveWebAsset(w, r, hasDiskWeb, webDir, "styles.css", "text/css")
 	}))
 	mux.HandleFunc("/app.js", withCORS(func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, filepath.Join(webDir, "app.js"))
+		serveWebAsset(w, r, hasDiskWeb, webDir, "app.js", "application/javascript")
 	}))
 
 	mux.HandleFunc("/", withCORS(func(w http.ResponseWriter, r *http.Request) {
 		accept := r.Header.Get("Accept")
 		if strings.Contains(accept, "text/html") {
-			http.ServeFile(w, r, filepath.Join(webDir, "index.html"))
+			serveWebAsset(w, r, hasDiskWeb, webDir, "index.html", "text/html")
 			return
 		}
 		cfg := config.LoadConfig()
@@ -224,7 +223,7 @@ func StartAPIServer(port int, repoPath string) error {
 	return http.ListenAndServe(addr, mux)
 }
 
-func findWebDir(repoPath string) (string, error) {
+func findWebDir(repoPath string) (string, bool) {
 	candidates := []string{
 		filepath.Join(repoPath, "go-source", "web"),
 		filepath.Join(repoPath, "web"),
@@ -232,10 +231,26 @@ func findWebDir(repoPath string) (string, error) {
 	}
 	for _, c := range candidates {
 		if _, err := os.Stat(filepath.Join(c, "index.html")); err == nil {
-			return c, nil
+			return c, true
 		}
 	}
-	return "", fmt.Errorf("could not find web directory")
+	return "", false
+}
+
+func serveWebAsset(w http.ResponseWriter, r *http.Request, hasDiskWeb bool, webDir, name, contentType string) {
+	if hasDiskWeb {
+		http.ServeFile(w, r, filepath.Join(webDir, name))
+		return
+	}
+
+	data, err := fs.ReadFile(webassets.Assets, name)
+	if err != nil {
+		http.Error(w, "web asset not found: "+name, http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", contentType)
+	_, _ = w.Write(data)
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {

@@ -10,6 +10,13 @@ go mod tidy
 go run ./cmd/difflearn
 ```
 
+## Test
+
+```bash
+cd go-source
+go test ./...
+```
+
 ## Commands
 
 - `difflearn` (interactive dashboard)
