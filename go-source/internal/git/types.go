@@ -55,3 +55,50 @@ type BranchInfo struct {
 	Current bool   `json:"current"`
 	Commit  string `json:"commit"`
 }
+
+type BranchKind string
+
+const (
+	BranchKindLocal  BranchKind = "local"
+	BranchKindRemote BranchKind = "remote"
+)
+
+type BranchDiffMode string
+
+const (
+	BranchModeTriple BranchDiffMode = "triple"
+	BranchModeDouble BranchDiffMode = "double"
+)
+
+type BranchEntry struct {
+	Name              string     `json:"name"`
+	Ref               string     `json:"ref"`
+	Kind              BranchKind `json:"kind"`
+	Current           bool       `json:"current"`
+	Remote            *string    `json:"remote"`
+	LocalName         string     `json:"localName"`
+	NeedsLocalization bool       `json:"needsLocalization"`
+	Commit            string     `json:"commit"`
+}
+
+type EnsureBranchResult struct {
+	Input               string  `json:"input"`
+	ResolvedLocalBranch string  `json:"resolvedLocalBranch"`
+	Localized           bool    `json:"localized"`
+	WasRemote           bool    `json:"wasRemote"`
+	RemoteRef           *string `json:"remoteRef"`
+	Message             string  `json:"message,omitempty"`
+}
+
+type SwitchBranchOptions struct {
+	AutoStash bool `json:"autoStash"`
+}
+
+type SwitchBranchResult struct {
+	PreviousBranch  string   `json:"previousBranch"`
+	CurrentBranch   string   `json:"currentBranch"`
+	StashCreated    bool     `json:"stashCreated"`
+	StashMessage    *string  `json:"stashMessage"`
+	LocalizedBranch *string  `json:"localizedBranch"`
+	Messages        []string `json:"messages"`
+}

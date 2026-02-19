@@ -13,6 +13,22 @@ let currentCommit = null;
 let commits = [];
 let pendingContext = null;
 let selectedForCompare = []; // Array of commit hashes selected for comparison (max 2)
+let branchEntries = [];
+let currentBranchName = '';
+let branchSelection = {
+    switchTo: '',
+    base: '',
+    target: '',
+    mode: 'triple',
+};
+let currentDiffContext = {
+    type: 'local',
+    staged: false,
+    commit: null,
+    branchBase: null,
+    branchTarget: null,
+    branchMode: 'triple',
+};
 
 // DOM Elements
 const elements = {
@@ -90,31 +106,71 @@ async function fetchHistory(limit = 20) {
     return await fetchJSON(`/history?limit=${limit}`);
 }
 
-async function askQuestion(question, staged = false, commit = null) {
+async function fetchBranches() {
+    return await fetchJSON('/branches');
+}
+
+async function fetchBranchDiff(base, target, mode = 'triple') {
+    const params = new URLSearchParams({
+        base,
+        target,
+        mode,
+    });
+    return await fetchJSON(`/diff/branch?${params.toString()}`);
+}
+
+async function switchBranch(branch, autoStash = true) {
+    return await fetchJSON('/branch/switch', {
+        method: 'POST',
+        body: JSON.stringify({ branch, autoStash }),
+    });
+}
+
+function getDiffRequestPayload() {
+    if (currentDiffContext.type === 'branch_compare' && currentDiffContext.branchBase && currentDiffContext.branchTarget) {
+        return {
+            branchBase: currentDiffContext.branchBase,
+            branchTarget: currentDiffContext.branchTarget,
+            branchMode: currentDiffContext.branchMode || 'triple',
+        };
+    }
+
+    if ((currentDiffContext.type === 'commit' || currentDiffContext.type === 'commit_compare') && currentDiffContext.commit) {
+        return {
+            commit: currentDiffContext.commit,
+        };
+    }
+
+    return {
+        staged: currentDiffContext.type === 'staged',
+    };
+}
+
+async function askQuestion(question, contextPayload = {}) {
     return await fetchJSON('/ask', {
         method: 'POST',
-        body: JSON.stringify({ question, staged, commit }),
+        body: JSON.stringify({ question, ...contextPayload }),
     });
 }
 
-async function explainDiff(staged = false, commit = null) {
+async function explainDiff(contextPayload = {}) {
     return await fetchJSON('/explain', {
         method: 'POST',
-        body: JSON.stringify({ staged, commit }),
+        body: JSON.stringify(contextPayload),
     });
 }
 
-async function reviewDiff(staged = false, commit = null) {
+async function reviewDiff(contextPayload = {}) {
     return await fetchJSON('/review', {
         method: 'POST',
-        body: JSON.stringify({ staged, commit }),
+        body: JSON.stringify(contextPayload),
     });
 }
 
-async function summarizeDiff(staged = false, commit = null) {
+async function summarizeDiff(contextPayload = {}) {
     return await fetchJSON('/summary', {
         method: 'POST',
-        body: JSON.stringify({ staged, commit }),
+        body: JSON.stringify(contextPayload),
     });
 }
 
@@ -125,9 +181,170 @@ async function summarizeDiff(staged = false, commit = null) {
 function renderCommitList() {
     if (currentView === 'history') {
         renderHistoryList();
+    } else if (currentView === 'branches') {
+        renderBranchView();
     } else {
         renderLocalChangesItem();
     }
+}
+
+function getBranchByRef(ref) {
+    return branchEntries.find(branch => branch.ref === ref || branch.name === ref);
+}
+
+function getBranchLabel(branch) {
+    if (!branch) return '';
+    const tags = [];
+    if (branch.current) tags.push('current');
+    if (branch.kind === 'remote' && branch.needsLocalization) tags.push('will localize');
+    const suffix = tags.length > 0 ? ` (${tags.join(', ')})` : '';
+    return `${branch.name}${suffix}`;
+}
+
+function renderBranchOptions(selectedRef) {
+    return branchEntries.map(branch => `
+      <option value="${escapeHtml(branch.ref)}" ${branch.ref === selectedRef ? 'selected' : ''}>
+        ${escapeHtml(getBranchLabel(branch))}
+      </option>
+    `).join('');
+}
+
+function updateBranchNotice() {
+    const noticeEl = document.getElementById('branchNotice');
+    if (!noticeEl) return;
+
+    const selectedRemoteBranches = [branchSelection.switchTo, branchSelection.base, branchSelection.target]
+        .map(getBranchByRef)
+        .filter(branch => branch && branch.kind === 'remote');
+
+    if (selectedRemoteBranches.length === 0) {
+        noticeEl.style.display = 'none';
+        noticeEl.textContent = '';
+        return;
+    }
+
+    const names = [...new Set(selectedRemoteBranches.map(branch => branch.name))];
+    noticeEl.style.display = 'block';
+    noticeEl.textContent = `DiffLearn will fetch and create a local tracking branch for ${names.join(', ')} before continuing.`;
+}
+
+function bindBranchViewEvents() {
+    const switchSelect = document.getElementById('switchBranchSelect');
+    const baseSelect = document.getElementById('branchBaseSelect');
+    const targetSelect = document.getElementById('branchTargetSelect');
+    const compareBtn = document.getElementById('compareBranchesBtn');
+    const switchBtn = document.getElementById('switchBranchBtn');
+    const modeInputs = document.querySelectorAll('input[name=\"branchCompareMode\"]');
+
+    switchSelect?.addEventListener('change', () => {
+        branchSelection.switchTo = switchSelect.value;
+        updateBranchNotice();
+    });
+
+    baseSelect?.addEventListener('change', () => {
+        branchSelection.base = baseSelect.value;
+        updateBranchNotice();
+    });
+
+    targetSelect?.addEventListener('change', () => {
+        branchSelection.target = targetSelect.value;
+        updateBranchNotice();
+    });
+
+    modeInputs.forEach(input => {
+        input.addEventListener('change', () => {
+            if (input.checked) {
+                branchSelection.mode = input.value;
+            }
+        });
+    });
+
+    compareBtn?.addEventListener('click', async () => {
+        if (!branchSelection.base || !branchSelection.target) return;
+        if (branchSelection.base === branchSelection.target) {
+            addMessage('assistant', '⚠️ Select two different branches to compare.');
+            return;
+        }
+        await loadBranchComparisonDiff(branchSelection.base, branchSelection.target, branchSelection.mode);
+    });
+
+    switchBtn?.addEventListener('click', async () => {
+        if (!branchSelection.switchTo) return;
+        await handleBranchSwitch(branchSelection.switchTo);
+    });
+}
+
+async function renderBranchView() {
+    elements.commitList.innerHTML = '<div class=\"loading\">Loading branches...</div>';
+
+    const result = await fetchBranches();
+    if (!result.success || !result.data) {
+        elements.commitList.innerHTML = `
+      <div class=\"empty-state\">
+        <div class=\"empty-icon\">❌</div>
+        <p>Error loading branches: ${escapeHtml(result.error || 'Unknown error')}</p>
+      </div>
+    `;
+        return;
+    }
+
+    branchEntries = result.data.branches || [];
+    currentBranchName = result.data.currentBranch || '';
+
+    const currentEntry = branchEntries.find(branch => branch.current)
+        || branchEntries.find(branch => branch.kind === 'local' && branch.name === currentBranchName)
+        || branchEntries[0];
+
+    if (!currentEntry) {
+        elements.commitList.innerHTML = `
+      <div class=\"empty-state\">
+        <div class=\"empty-icon\">🌿</div>
+        <p>No branches found</p>
+      </div>
+    `;
+        return;
+    }
+
+    if (!getBranchByRef(branchSelection.switchTo)) {
+        branchSelection.switchTo = currentEntry.ref;
+    }
+    if (!getBranchByRef(branchSelection.base)) {
+        branchSelection.base = currentEntry.ref;
+    }
+    if (!getBranchByRef(branchSelection.target) || branchSelection.target === branchSelection.base) {
+        const fallbackTarget = branchEntries.find(branch => branch.ref !== branchSelection.base) || currentEntry;
+        branchSelection.target = fallbackTarget.ref;
+    }
+    if (branchSelection.mode !== 'double') {
+        branchSelection.mode = 'triple';
+    }
+
+    elements.commitList.innerHTML = `
+      <div class=\"branch-panel\">
+        <div class=\"branch-row\">
+          <label class=\"branch-label\" for=\"switchBranchSelect\">Switch To</label>
+          <select id=\"switchBranchSelect\" class=\"branch-select\">${renderBranchOptions(branchSelection.switchTo)}</select>
+          <button id=\"switchBranchBtn\" class=\"btn btn-sm\">Switch</button>
+        </div>
+        <div class=\"branch-row\">
+          <label class=\"branch-label\" for=\"branchBaseSelect\">Base</label>
+          <select id=\"branchBaseSelect\" class=\"branch-select\">${renderBranchOptions(branchSelection.base)}</select>
+        </div>
+        <div class=\"branch-row\">
+          <label class=\"branch-label\" for=\"branchTargetSelect\">Target</label>
+          <select id=\"branchTargetSelect\" class=\"branch-select\">${renderBranchOptions(branchSelection.target)}</select>
+        </div>
+        <div class=\"branch-mode-row\">
+          <label><input type=\"radio\" name=\"branchCompareMode\" value=\"triple\" ${branchSelection.mode === 'triple' ? 'checked' : ''}> merge-base...target</label>
+          <label><input type=\"radio\" name=\"branchCompareMode\" value=\"double\" ${branchSelection.mode === 'double' ? 'checked' : ''}> base..target</label>
+        </div>
+        <button id=\"compareBranchesBtn\" class=\"compare-go-btn\">Compare Branches</button>
+        <div id=\"branchNotice\" class=\"branch-notice\" style=\"display:none;\"></div>
+      </div>
+    `;
+
+    bindBranchViewEvents();
+    updateBranchNotice();
 }
 
 async function renderLocalChangesItem() {
@@ -271,6 +488,14 @@ async function loadLocalDiff(staged = false) {
 
     currentDiff = result.data;
     currentCommit = null;
+    currentDiffContext = {
+        type: staged ? 'staged' : 'local',
+        staged,
+        commit: null,
+        branchBase: null,
+        branchTarget: null,
+        branchMode: 'triple',
+    };
 
     const label = staged ? 'Staged Changes' : 'Local Changes';
     renderDiff(result.data, label);
@@ -306,6 +531,14 @@ async function loadCommitDiff(sha) {
 
     currentDiff = result.data;
     currentCommit = sha;
+    currentDiffContext = {
+        type: 'commit',
+        staged: false,
+        commit: sha,
+        branchBase: null,
+        branchTarget: null,
+        branchMode: 'triple',
+    };
 
     const commit = commits.find(c => c.hash === sha);
     const title = commit ? `${sha.slice(0, 7)}: ${commit.message.split('\n')[0]}` : sha.slice(0, 7);
@@ -408,10 +641,16 @@ function renderDiffLine(line) {
 // ============================================
 
 function getContextLabel() {
-    if (currentView === 'history' && currentCommit) {
+    if (currentDiffContext.type === 'branch_compare' && currentDiffContext.branchBase && currentDiffContext.branchTarget) {
+        const baseBranch = getBranchByRef(currentDiffContext.branchBase);
+        const targetBranch = getBranchByRef(currentDiffContext.branchTarget);
+        const operator = currentDiffContext.branchMode === 'double' ? '..' : '...';
+        return `Branches ${baseBranch?.name || currentDiffContext.branchBase} ${operator} ${targetBranch?.name || currentDiffContext.branchTarget}`;
+    }
+    if ((currentDiffContext.type === 'commit' || currentDiffContext.type === 'commit_compare') && currentCommit) {
         return `Commit ${currentCommit.slice(0, 7)}`;
     }
-    return currentView === 'staged' ? 'Staged Changes' : 'Local Changes';
+    return currentDiffContext.type === 'staged' ? 'Staged Changes' : 'Local Changes';
 }
 
 function addMessage(role, content, meta = null) {
@@ -500,9 +739,7 @@ async function handleChat(question, contextOverride = null) {
     const loadingEl = addLoadingMessage();
 
     try {
-        const staged = currentView === 'staged';
-        const commit = currentView === 'history' ? currentCommit : null;
-        const result = await askQuestion(question, staged, commit);
+        const result = await askQuestion(question, getDiffRequestPayload());
 
         removeLoadingMessage();
 
@@ -547,8 +784,7 @@ function clearChat() {
 // ============================================
 
 async function handleQuickAction(action) {
-    const staged = currentView === 'staged';
-    const commit = currentView === 'history' ? currentCommit : null;
+    const requestPayload = getDiffRequestPayload();
     const btn = elements[`${action}Btn`];
     const originalText = btn.innerHTML;
 
@@ -570,13 +806,13 @@ async function handleQuickAction(action) {
         let result;
         switch (action) {
             case 'explain':
-                result = await explainDiff(staged, commit);
+                result = await explainDiff(requestPayload);
                 break;
             case 'review':
-                result = await reviewDiff(staged, commit);
+                result = await reviewDiff(requestPayload);
                 break;
             case 'summary':
-                result = await summarizeDiff(staged, commit);
+                result = await summarizeDiff(requestPayload);
                 break;
         }
 
@@ -615,8 +851,13 @@ function handleExport() {
 
     if (currentCommit) {
         markdown += `**Commit:** ${currentCommit}\n\n`;
+    } else if (currentDiffContext.type === 'branch_compare' && currentDiffContext.branchBase && currentDiffContext.branchTarget) {
+        const baseBranch = getBranchByRef(currentDiffContext.branchBase);
+        const targetBranch = getBranchByRef(currentDiffContext.branchTarget);
+        const operator = currentDiffContext.branchMode === 'double' ? '..' : '...';
+        markdown += `**Branches:** ${baseBranch?.name || currentDiffContext.branchBase} ${operator} ${targetBranch?.name || currentDiffContext.branchTarget}\n\n`;
     } else {
-        markdown += `**View:** ${currentView === 'staged' ? 'Staged Changes' : 'Local Changes'}\n\n`;
+        markdown += `**View:** ${currentDiffContext.type === 'staged' ? 'Staged Changes' : 'Local Changes'}\n\n`;
     }
 
     markdown += `---\n\n`;
@@ -662,6 +903,7 @@ const SLASH_COMMANDS = [
     { cmd: '/local', desc: 'Switch to local changes view', action: 'local' },
     { cmd: '/staged', desc: 'Switch to staged changes view', action: 'staged' },
     { cmd: '/history', desc: 'Switch to commit history view', action: 'history' },
+    { cmd: '/branches', desc: 'Switch to branch tools view', action: 'branches' },
     { cmd: '/clear', desc: 'Clear chat messages', action: 'clear' },
 ];
 
@@ -707,6 +949,10 @@ function handleSlashCommand(input) {
         case 'history':
             document.querySelector('[data-view="history"]')?.click();
             addMessage('assistant', '📜 Switched to Commit History view');
+            break;
+        case 'branches':
+            document.querySelector('[data-view="branches"]')?.click();
+            addMessage('assistant', '🌿 Switched to Branches view');
             break;
         case 'clear':
             clearChat();
@@ -783,6 +1029,14 @@ async function loadComparisonDiff() {
 
         currentDiff = result.data;
         currentCommit = `${sha1}..${sha2}`;
+        currentDiffContext = {
+            type: 'commit_compare',
+            staged: false,
+            commit: `${sha1}..${sha2}`,
+            branchBase: null,
+            branchTarget: null,
+            branchMode: 'triple',
+        };
 
         const commit1 = commits.find(c => c.hash === sha1);
         const commit2 = commits.find(c => c.hash === sha2);
@@ -801,6 +1055,91 @@ async function loadComparisonDiff() {
           </div>
         `;
     }
+}
+
+async function loadBranchComparisonDiff(baseRef, targetRef, mode = 'triple') {
+    elements.diffContent.innerHTML = '<div class="loading">Loading branch comparison...</div>';
+
+    try {
+        const result = await fetchBranchDiff(baseRef, targetRef, mode);
+
+        if (!result.success) {
+            elements.diffContent.innerHTML = `
+              <div class="empty-state">
+                <div class="empty-icon">❌</div>
+                <p>Error loading branch comparison: ${escapeHtml(result.error || 'Unknown error')}</p>
+              </div>
+            `;
+            return;
+        }
+
+        currentDiff = result.data;
+        currentCommit = null;
+        currentDiffContext = {
+            type: 'branch_compare',
+            staged: false,
+            commit: null,
+            branchBase: baseRef,
+            branchTarget: targetRef,
+            branchMode: mode,
+        };
+
+        const baseBranch = getBranchByRef(baseRef);
+        const targetBranch = getBranchByRef(targetRef);
+        const operator = mode === 'double' ? '..' : '...';
+        const title = `${baseBranch?.name || baseRef} ${operator} ${targetBranch?.name || targetRef}`;
+        renderDiff(result.data, title);
+
+        const comparison = result.data?.comparison;
+        if (comparison?.messages?.length > 0) {
+            addMessage('assistant', comparison.messages.join('\n'));
+        }
+    } catch (error) {
+        elements.diffContent.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">❌</div>
+            <p>Error: ${escapeHtml(error.message)}</p>
+          </div>
+        `;
+    }
+}
+
+async function handleBranchSwitch(branchRef) {
+    const selected = getBranchByRef(branchRef);
+    const branchName = selected?.name || branchRef;
+    const result = await switchBranch(branchRef, true);
+
+    if (!result.success || !result.data) {
+        addMessage('assistant', `Error switching branch: ${result.error || 'Unknown error'}`);
+        return;
+    }
+
+    const messages = result.data.messages || [];
+    addMessage('assistant', `🌿 Switched to \`${result.data.currentBranch}\`\n\n${messages.join('\n')}`);
+
+    currentDiff = null;
+    currentCommit = null;
+    currentDiffContext = {
+        type: 'local',
+        staged: false,
+        commit: null,
+        branchBase: null,
+        branchTarget: null,
+        branchMode: 'triple',
+    };
+
+    elements.diffHeader.querySelector('h2').textContent = `Switched to ${branchName}`;
+    elements.diffStats.innerHTML = '';
+    elements.quickActions.style.display = 'none';
+    elements.diffContent.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">✅</div>
+        <p>Branch switched successfully. Select a view to load new changes.</p>
+      </div>
+    `;
+
+    await checkLLMStatus();
+    await renderCommitList();
 }
 
 // ============================================
@@ -1096,4 +1435,3 @@ async function init() {
 }
 
 init();
-

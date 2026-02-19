@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
+	"time"
 )
 
 type DiffOptions struct {
@@ -41,6 +43,42 @@ func (g *GitExtractor) runGit(args ...string) (string, error) {
 		return "", fmt.Errorf("git %s failed: %s", strings.Join(args, " "), msg)
 	}
 	return out.String(), nil
+}
+
+func normalizeBranchDiffMode(mode BranchDiffMode) BranchDiffMode {
+	if mode == BranchModeDouble {
+		return BranchModeDouble
+	}
+	return BranchModeTriple
+}
+
+func branchRange(base, target string, mode BranchDiffMode) string {
+	if normalizeBranchDiffMode(mode) == BranchModeDouble {
+		return base + ".." + target
+	}
+	return base + "..." + target
+}
+
+func (g *GitExtractor) findBranchEntry(branchRef string, branches []BranchEntry) *BranchEntry {
+	trimmed := strings.TrimSpace(branchRef)
+	if trimmed == "" {
+		return nil
+	}
+
+	for i := range branches {
+		branch := branches[i]
+		if branch.Name == trimmed || branch.Ref == trimmed {
+			return &branch
+		}
+		if branch.Kind == BranchKindLocal && "refs/heads/"+branch.Name == trimmed {
+			return &branch
+		}
+		if branch.Kind == BranchKindRemote && "refs/remotes/"+branch.Name == trimmed {
+			return &branch
+		}
+	}
+
+	return nil
 }
 
 func (g *GitExtractor) GetLocalDiff(options DiffOptions) ([]ParsedDiff, error) {
@@ -80,8 +118,12 @@ func (g *GitExtractor) GetCommitDiff(commit1 string, commit2 string) ([]ParsedDi
 	return g.parser.Parse(raw), nil
 }
 
-func (g *GitExtractor) GetBranchDiff(branch1, branch2 string) ([]ParsedDiff, error) {
-	raw, err := g.runGit("diff", branch1+"..."+branch2)
+func (g *GitExtractor) GetBranchDiff(branch1, branch2 string, mode ...BranchDiffMode) ([]ParsedDiff, error) {
+	effectiveMode := BranchModeTriple
+	if len(mode) > 0 {
+		effectiveMode = normalizeBranchDiffMode(mode[0])
+	}
+	raw, err := g.runGit("diff", branchRange(branch1, branch2, effectiveMode))
 	if err != nil {
 		return nil, err
 	}
@@ -140,6 +182,226 @@ func (g *GitExtractor) GetCommitHistory(limit int) ([]CommitInfo, error) {
 		})
 	}
 	return commits, nil
+}
+
+func (g *GitExtractor) GetBranchesDetailed() ([]BranchEntry, error) {
+	currentBranch, _ := g.GetCurrentBranch()
+	out, err := g.runGit("for-each-ref", "--format=%(refname)%09%(refname:short)%09%(objectname)", "refs/heads", "refs/remotes")
+	if err != nil {
+		return nil, err
+	}
+
+	localBranches := make(map[string]BranchEntry)
+	remoteBranches := make([]BranchEntry, 0)
+
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		parts := strings.Split(line, "\t")
+		if len(parts) < 2 {
+			continue
+		}
+		ref := parts[0]
+		shortName := parts[1]
+		commit := ""
+		if len(parts) > 2 {
+			commit = parts[2]
+		}
+
+		if strings.HasSuffix(shortName, "/HEAD") {
+			continue
+		}
+
+		if strings.HasPrefix(ref, "refs/heads/") {
+			localBranches[shortName] = BranchEntry{
+				Name:              shortName,
+				Ref:               ref,
+				Kind:              BranchKindLocal,
+				Current:           shortName == currentBranch,
+				Remote:            nil,
+				LocalName:         shortName,
+				NeedsLocalization: false,
+				Commit:            commit,
+			}
+			continue
+		}
+
+		if !strings.HasPrefix(ref, "refs/remotes/") {
+			continue
+		}
+
+		slashIdx := strings.Index(shortName, "/")
+		if slashIdx < 0 {
+			continue
+		}
+		remote := shortName[:slashIdx]
+		localName := shortName[slashIdx+1:]
+		if localName == "" {
+			continue
+		}
+
+		remoteBranches = append(remoteBranches, BranchEntry{
+			Name:              shortName,
+			Ref:               ref,
+			Kind:              BranchKindRemote,
+			Current:           false,
+			Remote:            &remote,
+			LocalName:         localName,
+			NeedsLocalization: false,
+			Commit:            commit,
+		})
+	}
+
+	entries := make([]BranchEntry, 0, len(localBranches)+len(remoteBranches))
+	localSet := make(map[string]bool)
+	for _, local := range localBranches {
+		entries = append(entries, local)
+		localSet[local.Name] = true
+	}
+	for _, remote := range remoteBranches {
+		remote.NeedsLocalization = !localSet[remote.LocalName]
+		entries = append(entries, remote)
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].Kind != entries[j].Kind {
+			return entries[i].Kind == BranchKindLocal
+		}
+		return entries[i].Name < entries[j].Name
+	})
+
+	return entries, nil
+}
+
+func (g *GitExtractor) EnsureLocalBranch(branchRef string) (EnsureBranchResult, error) {
+	branches, err := g.GetBranchesDetailed()
+	if err != nil {
+		return EnsureBranchResult{}, err
+	}
+	selected := g.findBranchEntry(branchRef, branches)
+	if selected == nil {
+		return EnsureBranchResult{}, fmt.Errorf("branch not found: %s", branchRef)
+	}
+
+	if selected.Kind == BranchKindLocal {
+		return EnsureBranchResult{
+			Input:               branchRef,
+			ResolvedLocalBranch: selected.Name,
+			Localized:           false,
+			WasRemote:           false,
+			RemoteRef:           nil,
+		}, nil
+	}
+
+	if selected.Remote == nil {
+		return EnsureBranchResult{}, fmt.Errorf("remote name missing for branch: %s", selected.Name)
+	}
+
+	remoteName := *selected.Remote
+	_, err = g.runGit("fetch", remoteName, selected.LocalName)
+	if err != nil {
+		return EnsureBranchResult{}, err
+	}
+
+	localExists := false
+	for _, branch := range branches {
+		if branch.Kind == BranchKindLocal && branch.Name == selected.LocalName {
+			localExists = true
+			break
+		}
+	}
+
+	localized := false
+	if !localExists {
+		_, err = g.runGit("branch", "--track", selected.LocalName, remoteName+"/"+selected.LocalName)
+		if err != nil && !strings.Contains(err.Error(), "already exists") {
+			return EnsureBranchResult{}, err
+		}
+		localized = true
+	}
+
+	action := "resolved to local branch"
+	if localized {
+		action = "created a local tracking branch"
+	}
+	message := fmt.Sprintf("DiffLearn fetched %s and %s %s for comparison and learning.", selected.Name, action, selected.LocalName)
+	remoteRef := selected.Name
+
+	return EnsureBranchResult{
+		Input:               branchRef,
+		ResolvedLocalBranch: selected.LocalName,
+		Localized:           localized,
+		WasRemote:           true,
+		RemoteRef:           &remoteRef,
+		Message:             message,
+	}, nil
+}
+
+func (g *GitExtractor) SwitchBranch(branchRef string, options SwitchBranchOptions) (SwitchBranchResult, error) {
+	previousBranch, err := g.GetCurrentBranch()
+	if err != nil {
+		return SwitchBranchResult{}, err
+	}
+
+	enabledAutoStash := options.AutoStash
+
+	ensured, err := g.EnsureLocalBranch(branchRef)
+	if err != nil {
+		return SwitchBranchResult{}, err
+	}
+
+	messages := make([]string, 0)
+	if ensured.Message != "" {
+		messages = append(messages, ensured.Message)
+	}
+
+	stashCreated := false
+	var stashMessage *string
+
+	if enabledAutoStash {
+		status, err := g.runGit("status", "--porcelain")
+		if err != nil {
+			return SwitchBranchResult{}, err
+		}
+		if strings.TrimSpace(status) != "" {
+			msg := fmt.Sprintf("DiffLearn auto-stash before switching to %s at %s", ensured.ResolvedLocalBranch, time.Now().UTC().Format(time.RFC3339))
+			out, err := g.runGit("stash", "push", "-u", "-m", msg)
+			if err != nil {
+				return SwitchBranchResult{}, err
+			}
+			if !strings.Contains(out, "No local changes to save") {
+				stashCreated = true
+				stashMessage = &msg
+				messages = append(messages, "Created stash: "+msg)
+			}
+		}
+	}
+
+	_, err = g.runGit("checkout", ensured.ResolvedLocalBranch)
+	if err != nil {
+		return SwitchBranchResult{}, err
+	}
+
+	currentBranch, err := g.GetCurrentBranch()
+	if err != nil {
+		return SwitchBranchResult{}, err
+	}
+	messages = append(messages, fmt.Sprintf("Switched from %s to %s.", previousBranch, currentBranch))
+
+	var localizedBranch *string
+	if ensured.Localized {
+		localizedBranch = &ensured.ResolvedLocalBranch
+	}
+
+	return SwitchBranchResult{
+		PreviousBranch:  previousBranch,
+		CurrentBranch:   currentBranch,
+		StashCreated:    stashCreated,
+		StashMessage:    stashMessage,
+		LocalizedBranch: localizedBranch,
+		Messages:        messages,
+	}, nil
 }
 
 func (g *GitExtractor) GetBranches() ([]BranchInfo, error) {
@@ -201,7 +463,11 @@ func (g *GitExtractor) GetRawDiff(kind string, options map[string]string) (strin
 		if b1 == "" || b2 == "" {
 			return "", fmt.Errorf("branch1 and branch2 are required")
 		}
-		return g.runGit("diff", b1+"..."+b2)
+		mode := BranchModeTriple
+		if options["branchMode"] == "double" {
+			mode = BranchModeDouble
+		}
+		return g.runGit("diff", branchRange(b1, b2, mode))
 	default:
 		return "", fmt.Errorf("unknown diff type: %s", kind)
 	}

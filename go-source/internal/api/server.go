@@ -16,6 +16,82 @@ import (
 	webassets "difflearn-go/web"
 )
 
+type diffRequestBody struct {
+	Question     string `json:"question"`
+	Staged       bool   `json:"staged"`
+	Commit       string `json:"commit"`
+	BranchBase   string `json:"branchBase"`
+	BranchTarget string `json:"branchTarget"`
+	BranchMode   string `json:"branchMode"`
+}
+
+func normalizeBranchMode(mode string) git.BranchDiffMode {
+	if mode == string(git.BranchModeDouble) {
+		return git.BranchModeDouble
+	}
+	return git.BranchModeTriple
+}
+
+func formattedDiffPayload(formatter *git.DiffFormatter, diffs []git.ParsedDiff, comparison map[string]any) map[string]any {
+	parsed := map[string]any{}
+	_ = json.Unmarshal([]byte(formatter.ToJSON(diffs)), &parsed)
+	if comparison != nil {
+		parsed["comparison"] = comparison
+	}
+	return parsed
+}
+
+func resolveBranchComparison(g *git.GitExtractor, base, target string, mode git.BranchDiffMode) ([]git.ParsedDiff, map[string]any, error) {
+	baseResolved, err := g.EnsureLocalBranch(base)
+	if err != nil {
+		return nil, nil, err
+	}
+	targetResolved, err := g.EnsureLocalBranch(target)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	diffs, err := g.GetBranchDiff(baseResolved.ResolvedLocalBranch, targetResolved.ResolvedLocalBranch, mode)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	localizedBranches := make([]string, 0)
+	if baseResolved.Localized {
+		localizedBranches = append(localizedBranches, baseResolved.ResolvedLocalBranch)
+	}
+	if targetResolved.Localized {
+		found := false
+		for _, existing := range localizedBranches {
+			if existing == targetResolved.ResolvedLocalBranch {
+				found = true
+				break
+			}
+		}
+		if !found {
+			localizedBranches = append(localizedBranches, targetResolved.ResolvedLocalBranch)
+		}
+	}
+
+	messages := make([]string, 0)
+	if baseResolved.Message != "" {
+		messages = append(messages, baseResolved.Message)
+	}
+	if targetResolved.Message != "" && targetResolved.Message != baseResolved.Message {
+		messages = append(messages, targetResolved.Message)
+	}
+
+	comparison := map[string]any{
+		"baseResolved":      baseResolved.ResolvedLocalBranch,
+		"targetResolved":    targetResolved.ResolvedLocalBranch,
+		"mode":              mode,
+		"localizedBranches": localizedBranches,
+		"messages":          messages,
+	}
+
+	return diffs, comparison, nil
+}
+
 func StartAPIServer(port int, repoPath string) error {
 	if port == 0 {
 		port = 3000
@@ -66,6 +142,27 @@ func StartAPIServer(port int, repoPath string) error {
 		})
 	}))
 
+	mux.HandleFunc("/branches", withCORS(func(w http.ResponseWriter, r *http.Request) {
+		branches, err := g.GetBranchesDetailed()
+		if err != nil {
+			writeJSON(w, 500, map[string]any{"success": false, "error": err.Error()})
+			return
+		}
+		current, err := g.GetCurrentBranch()
+		if err != nil {
+			writeJSON(w, 500, map[string]any{"success": false, "error": err.Error()})
+			return
+		}
+
+		writeJSON(w, 200, map[string]any{
+			"success": true,
+			"data": map[string]any{
+				"currentBranch": current,
+				"branches":      branches,
+			},
+		})
+	}))
+
 	mux.HandleFunc("/diff/local", withCORS(func(w http.ResponseWriter, r *http.Request) {
 		staged := r.URL.Query().Get("staged") == "true"
 		format := r.URL.Query().Get("format")
@@ -88,9 +185,7 @@ func StartAPIServer(port int, repoPath string) error {
 			}
 			w.Write([]byte(raw))
 		default:
-			var parsed any
-			_ = json.Unmarshal([]byte(formatter.ToJSON(diffs)), &parsed)
-			writeJSON(w, 200, map[string]any{"success": true, "data": parsed})
+			writeJSON(w, 200, map[string]any{"success": true, "data": formattedDiffPayload(formatter, diffs, nil)})
 		}
 	}))
 
@@ -102,9 +197,34 @@ func StartAPIServer(port int, repoPath string) error {
 			writeJSON(w, 500, map[string]any{"success": false, "error": err.Error()})
 			return
 		}
-		var parsed any
-		_ = json.Unmarshal([]byte(formatter.ToJSON(diffs)), &parsed)
-		writeJSON(w, 200, map[string]any{"success": true, "data": parsed})
+		writeJSON(w, 200, map[string]any{"success": true, "data": formattedDiffPayload(formatter, diffs, nil)})
+	}))
+
+	mux.HandleFunc("/diff/branch", withCORS(func(w http.ResponseWriter, r *http.Request) {
+		base := r.URL.Query().Get("base")
+		target := r.URL.Query().Get("target")
+		if base == "" || target == "" {
+			writeJSON(w, 400, map[string]any{"success": false, "error": "base and target are required"})
+			return
+		}
+		mode := normalizeBranchMode(r.URL.Query().Get("mode"))
+		format := r.URL.Query().Get("format")
+		if format == "" {
+			format = "json"
+		}
+
+		diffs, comparison, err := resolveBranchComparison(g, base, target, mode)
+		if err != nil {
+			writeJSON(w, 500, map[string]any{"success": false, "error": err.Error()})
+			return
+		}
+
+		if format == "markdown" {
+			w.Write([]byte(formatter.ToMarkdown(diffs)))
+			return
+		}
+
+		writeJSON(w, 200, map[string]any{"success": true, "data": formattedDiffPayload(formatter, diffs, comparison)})
 	}))
 
 	mux.HandleFunc("/diff/branch/", withCORS(func(w http.ResponseWriter, r *http.Request) {
@@ -113,14 +233,51 @@ func StartAPIServer(port int, repoPath string) error {
 			writeJSON(w, 400, map[string]any{"success": false, "error": "branch1 and branch2 required"})
 			return
 		}
-		diffs, err := g.GetBranchDiff(parts[0], parts[1])
+		branch1 := parts[0]
+		branch2 := parts[1]
+		mode := normalizeBranchMode(r.URL.Query().Get("mode"))
+		format := r.URL.Query().Get("format")
+		if format == "" {
+			format = "json"
+		}
+
+		diffs, comparison, err := resolveBranchComparison(g, branch1, branch2, mode)
 		if err != nil {
 			writeJSON(w, 500, map[string]any{"success": false, "error": err.Error()})
 			return
 		}
-		var parsed any
-		_ = json.Unmarshal([]byte(formatter.ToJSON(diffs)), &parsed)
-		writeJSON(w, 200, map[string]any{"success": true, "data": parsed})
+
+		if format == "markdown" {
+			w.Write([]byte(formatter.ToMarkdown(diffs)))
+			return
+		}
+
+		writeJSON(w, 200, map[string]any{"success": true, "data": formattedDiffPayload(formatter, diffs, comparison)})
+	}))
+
+	mux.HandleFunc("/branch/switch", withCORS(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Branch    string `json:"branch"`
+			AutoStash *bool  `json:"autoStash"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if strings.TrimSpace(body.Branch) == "" {
+			writeJSON(w, 400, map[string]any{"success": false, "error": "branch is required"})
+			return
+		}
+
+		autoStash := true
+		if body.AutoStash != nil {
+			autoStash = *body.AutoStash
+		}
+
+		result, err := g.SwitchBranch(body.Branch, git.SwitchBranchOptions{AutoStash: autoStash})
+		if err != nil {
+			writeJSON(w, 500, map[string]any{"success": false, "error": err.Error()})
+			return
+		}
+
+		writeJSON(w, 200, map[string]any{"success": true, "data": result})
 	}))
 
 	mux.HandleFunc("/history", withCORS(func(w http.ResponseWriter, r *http.Request) {
@@ -138,14 +295,10 @@ func StartAPIServer(port int, repoPath string) error {
 
 	aiHandler := func(kind string) http.HandlerFunc {
 		return withCORS(func(w http.ResponseWriter, r *http.Request) {
-			var body struct {
-				Question string `json:"question"`
-				Staged   bool   `json:"staged"`
-				Commit   string `json:"commit"`
-			}
+			var body diffRequestBody
 			_ = json.NewDecoder(r.Body).Decode(&body)
 
-			diffs, err := getDiffForRequest(g, body.Commit, body.Staged)
+			diffs, err := getDiffForRequest(g, body)
 			if err != nil {
 				writeJSON(w, 500, map[string]any{"success": false, "error": err.Error()})
 				return
@@ -259,15 +412,22 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	_ = json.NewEncoder(w).Encode(payload)
 }
 
-func getDiffForRequest(g *git.GitExtractor, commit string, staged bool) ([]git.ParsedDiff, error) {
-	if commit != "" {
-		if strings.Contains(commit, "..") {
-			parts := strings.SplitN(commit, "..", 2)
+func getDiffForRequest(g *git.GitExtractor, body diffRequestBody) ([]git.ParsedDiff, error) {
+	if body.BranchBase != "" && body.BranchTarget != "" {
+		mode := normalizeBranchMode(body.BranchMode)
+		diffs, _, err := resolveBranchComparison(g, body.BranchBase, body.BranchTarget, mode)
+		return diffs, err
+	}
+
+	if body.Commit != "" {
+		if strings.Contains(body.Commit, "..") {
+			parts := strings.SplitN(body.Commit, "..", 2)
 			if len(parts) == 2 {
 				return g.GetCommitDiff(parts[0], parts[1])
 			}
 		}
-		return g.GetCommitDiff(commit, "")
+		return g.GetCommitDiff(body.Commit, "")
 	}
-	return g.GetLocalDiff(git.DiffOptions{Staged: staged})
+
+	return g.GetLocalDiff(git.DiffOptions{Staged: body.Staged})
 }
