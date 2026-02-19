@@ -139,6 +139,56 @@ describe('GitExtractor', () => {
         });
     });
 
+    describe('branch workflow helpers', () => {
+        test('should return detailed local and remote branch metadata', async () => {
+            const branches = await git.getBranchesDetailed();
+
+            expect(branches).toBeArray();
+            expect(branches.length).toBeGreaterThan(0);
+
+            const first = branches[0];
+            expect(first).toHaveProperty('name');
+            expect(first).toHaveProperty('ref');
+            expect(first).toHaveProperty('kind');
+            expect(first).toHaveProperty('current');
+            expect(first).toHaveProperty('localName');
+            expect(first).toHaveProperty('needsLocalization');
+        });
+
+        test('should resolve local branch without localization', async () => {
+            const current = await git.getCurrentBranch();
+            const result = await git.ensureLocalBranch(current);
+
+            expect(result.resolvedLocalBranch).toBe(current);
+            expect(result.wasRemote).toBe(false);
+            expect(result.localized).toBe(false);
+        });
+
+        test('should support explicit branch diff mode', async () => {
+            const current = await git.getCurrentBranch();
+            const triple = await git.getBranchDiff(current, current, 'triple');
+            const double = await git.getBranchDiff(current, current, 'double');
+
+            expect(triple).toBeArray();
+            expect(double).toBeArray();
+        });
+
+        test('should switch branch and return metadata', async () => {
+            const current = await git.getCurrentBranch();
+            try {
+                const result = await git.switchBranch(current, { autoStash: false });
+                expect(result).toHaveProperty('previousBranch');
+                expect(result).toHaveProperty('currentBranch', current);
+                expect(result).toHaveProperty('stashCreated');
+                expect(result).toHaveProperty('messages');
+                expect(result.messages).toBeArray();
+            } catch (error) {
+                // Some CI sandboxes deny writes to .git/index.lock for checkout operations.
+                expect(String(error)).toContain('.git/index.lock');
+            }
+        });
+    });
+
     describe('getCurrentBranch()', () => {
         test('should return current branch name', async () => {
             const current = await git.getCurrentBranch();

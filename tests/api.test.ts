@@ -9,6 +9,8 @@ let serverProcess: any;
 let commitHash = '';
 let branch1 = '';
 let branch2 = '';
+let currentBranch = '';
+const slashBranch = 'test/difflearn-api-branch';
 
 describe('API Server', () => {
     beforeAll(async () => {
@@ -36,11 +38,31 @@ describe('API Server', () => {
         const branches = await git.getBranches();
         branch1 = branches[0]?.name || '';
         branch2 = branches[1]?.name || branches[0]?.name || '';
+        currentBranch = await git.getCurrentBranch();
+
+        const existing = Bun.spawnSync(['git', 'branch', '--list', slashBranch], {
+            cwd: process.cwd(),
+            stdout: 'pipe',
+            stderr: 'pipe',
+        });
+        const existingOutput = new TextDecoder().decode(existing.stdout).trim();
+        if (!existingOutput) {
+            Bun.spawnSync(['git', 'branch', slashBranch, currentBranch], {
+                cwd: process.cwd(),
+                stdout: 'pipe',
+                stderr: 'pipe',
+            });
+        }
     });
 
     afterAll(() => {
         // Kill the server process
         serverProcess?.kill();
+        Bun.spawnSync(['git', 'branch', '-D', slashBranch], {
+            cwd: process.cwd(),
+            stdout: 'pipe',
+            stderr: 'pipe',
+        });
     });
 
     describe('GET /', () => {
@@ -143,6 +165,69 @@ describe('API Server', () => {
             const data = await response.json();
             expect(data.success).toBe(true);
         });
+
+        test('should return branch diff from canonical query endpoint', async () => {
+            if (!branch1 || !branch2) return;
+            const query = new URLSearchParams({
+                base: branch1,
+                target: branch2,
+                mode: 'double',
+            });
+            const response = await fetch(`${API_BASE}/diff/branch?${query.toString()}`);
+
+            expect(response.ok).toBe(true);
+            const data = await response.json();
+            expect(data.success).toBe(true);
+            expect(data.data).toHaveProperty('comparison');
+            expect(data.data.comparison).toHaveProperty('mode', 'double');
+        });
+
+        test('should support query endpoint with slash branch names', async () => {
+            if (!currentBranch) return;
+            const query = new URLSearchParams({
+                base: slashBranch,
+                target: currentBranch,
+                mode: 'triple',
+            });
+            const response = await fetch(`${API_BASE}/diff/branch?${query.toString()}`);
+
+            expect(response.ok).toBe(true);
+            const data = await response.json();
+            expect(data.success).toBe(true);
+            expect(data.data).toHaveProperty('comparison');
+            expect(data.data.comparison).toHaveProperty('baseResolved');
+            expect(data.data.comparison).toHaveProperty('targetResolved');
+        });
+    });
+
+    describe('GET /branches', () => {
+        test('should return branch list and current branch', async () => {
+            const response = await fetch(`${API_BASE}/branches`);
+
+            expect(response.ok).toBe(true);
+            const data = await response.json();
+            expect(data.success).toBe(true);
+            expect(data.data).toHaveProperty('currentBranch');
+            expect(data.data).toHaveProperty('branches');
+            expect(data.data.branches).toBeArray();
+        });
+    });
+
+    describe('POST /branch/switch', () => {
+        test('should switch to selected branch and return metadata', async () => {
+            if (!currentBranch) return;
+            const response = await fetch(`${API_BASE}/branch/switch`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ branch: currentBranch, autoStash: false }),
+            });
+
+            expect(response.ok).toBe(true);
+            const data = await response.json();
+            expect(data.success).toBe(true);
+            expect(data.data).toHaveProperty('currentBranch', currentBranch);
+            expect(data.data).toHaveProperty('messages');
+        });
     });
 
     describe('GET /history', () => {
@@ -204,6 +289,24 @@ describe('API Server', () => {
             const data = await response.json();
             expect(data.success).toBe(true);
         });
+
+        test('should accept branch context payload', async () => {
+            if (!currentBranch) return;
+            const response = await fetch(`${API_BASE}/ask`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    question: 'What changed?',
+                    branchBase: currentBranch,
+                    branchTarget: currentBranch,
+                    branchMode: 'triple',
+                }),
+            });
+
+            expect(response.ok).toBe(true);
+            const data = await response.json();
+            expect(data.success).toBe(true);
+        });
     });
 
     describe('POST /explain', () => {
@@ -219,6 +322,23 @@ describe('API Server', () => {
             const data = await response.json();
             expect(data.success).toBe(true);
             expect(data.data).toBeDefined();
+        });
+
+        test('should accept branch compare context', async () => {
+            if (!currentBranch) return;
+            const response = await fetch(`${API_BASE}/explain`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    branchBase: currentBranch,
+                    branchTarget: currentBranch,
+                    branchMode: 'double',
+                }),
+            });
+
+            expect(response.ok).toBe(true);
+            const data = await response.json();
+            expect(data.success).toBe(true);
         });
     });
 
