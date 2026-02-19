@@ -18,6 +18,17 @@ DiffLearn helps developers understand code changes through an interactive termin
 - **🔌 MCP Server** - Full integration with Cursor, Claude Code, and other MCP clients
 - **⌨️ Keyboard First** - Full scrolling and windowing support for large diffs and histories
 
+### Deciding between the GO version or Typescript version
+
+- CPU Time is fairly lower on the GO version compared to the Typescript version (it is also far less interactive):
+<img width="1018" height="92" alt="difflearn-cpu" src="https://github.com/user-attachments/assets/79d7ddfc-2edd-4f25-89e3-1c314492db77" />
+
+- Memory consumption has a huge difference, if I were in a resource constraint machine GO would be my go to:
+<img width="1108" height="113" alt="difflearn-memory" src="https://github.com/user-attachments/assets/65d4441f-5a34-408e-9a81-7e74fc0753e7" />
+
+- Disk usage, I do not know why it is higher as I did the same thing... maybe it just node doing node things?
+<img width="622" height="97" alt="difflearn-readandwrite" src="https://github.com/user-attachments/assets/61c2d4d7-9d04-4f7d-b163-8ab6e05c3e1a" />
+
 
 ## Getting Started
 
